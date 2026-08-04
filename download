@@ -1,0 +1,42 @@
+# Sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Node (si se usa en el futuro)
+node_modules/
+package-lock.json
+yarn.lock
+dist/
+
+# Archivos de sistema
+.AppleDouble
+.LSOverride
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Backups
+*.backup
+*.bak
+*.tmp
+
+# Archivos locales (datos personales)
+*-local.json
+datos-personales.*
