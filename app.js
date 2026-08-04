@@ -1,46 +1,50 @@
 /* =========================================================
-   MUNDIAL 2042 · HIELO ETERNO — app.js
+   MUNDIAL 2042 · HIELO ETERNO — app.js (v2.0)
+   Aplicación web mejorada para gestión de torneos
    ========================================================= */
 
 const ADMIN_KEY = "AURORA2042";
+const MAX_IMAGE_MB = 2;
+const MAX_IMAGE_SIZE = MAX_IMAGE_MB * 1024 * 1024;
 
+/* ============ TEAM DATA ============ */
 const TEAM_DATA = [
-  // group A
+  // Group A
   {code:'ALE', name:'Alemania', flag:'🇩🇪', group:'A'},
   {code:'EEU', name:'Estados Unidos', flag:'🇺🇸', group:'A'},
   {code:'AUS', name:'Australia', flag:'🇦🇺', group:'A'},
   {code:'ECU', name:'Ecuador', flag:'🇪🇨', group:'A'},
-  // group B
+  // Group B
   {code:'CON', name:'Congo', flag:'🇨🇩', group:'B'},
   {code:'JAP', name:'Japón', flag:'🇯🇵', group:'B'},
   {code:'PAR', name:'Paraguay', flag:'🇵🇾', group:'B'},
   {code:'DIN', name:'Dinamarca', flag:'🇩🇰', group:'B'},
-  // group C
+  // Group C
   {code:'CRC', name:'Costa Rica', flag:'🇨🇷', group:'C'},
   {code:'ITA', name:'Italia', flag:'🇮🇹', group:'C'},
   {code:'CRO', name:'Croacia', flag:'🇭🇷', group:'C'},
   {code:'ARG', name:'Argentina', flag:'🇦🇷', group:'C'},
-  // group D
+  // Group D
   {code:'CHI', name:'Chile', flag:'🇨🇱', group:'D'},
   {code:'BEL', name:'Bélgica', flag:'🇧🇪', group:'D'},
   {code:'FRA', name:'Francia', flag:'🇫🇷', group:'D'},
   {code:'PAN', name:'Panamá', flag:'🇵🇦', group:'D'},
-  // group E
+  // Group E
   {code:'MAR', name:'Marruecos', flag:'🇲🇦', group:'E'},
   {code:'URU', name:'Uruguay', flag:'🇺🇾', group:'E'},
   {code:'BRA', name:'Brasil', flag:'🇧🇷', group:'E'},
   {code:'GEO', name:'Georgia', flag:'🇬🇪', group:'E'},
-  // group F
+  // Group F
   {code:'CAB', name:'Cabo Verde', flag:'🇨🇻', group:'F'},
   {code:'POR', name:'Portugal', flag:'🇵🇹', group:'F'},
   {code:'BIH', name:'Bosnia y Herzegovina', flag:'🇧🇦', group:'F'},
   {code:'NOR', name:'Noruega', flag:'🇳🇴', group:'F'},
-  // group G
+  // Group G
   {code:'EGI', name:'Egipto', flag:'🇪🇬', group:'G'},
   {code:'ESP', name:'España', flag:'🇪🇸', group:'G'},
   {code:'NED', name:'Países Bajos', flag:'🇳🇱', group:'G'},
   {code:'MEX', name:'México', flag:'🇲🇽', group:'G'},
-  // group H
+  // Group H
   {code:'GHA', name:'Ghana', flag:'🇬🇭', group:'H'},
   {code:'ING', name:'Inglaterra', flag:'🏴', group:'H'},
   {code:'NGA', name:'Nigeria', flag:'🇳🇬', group:'H'},
@@ -56,6 +60,7 @@ const HISTORY = [
   {year:2034, host:'España', flag:'🇪🇸', final:'3-2 Ghana', third:'Colombia 3-2 Mexico', balon:'Julian Alvarez', goleador:'Julian Alvarez', fairplay:'Ghana', star:2},
 ];
 
+/* ============ STATE MANAGEMENT ============ */
 function defaultState(){
   const matches = [];
   GROUP_LETTERS.forEach(g=>{
@@ -68,12 +73,12 @@ function defaultState(){
   });
 
   return {
-    profile:{name:'DT IPFT', color:'#f2c230', desc:'Estratega polar. Cazador de auroras.', pronouns:'él/he', follows:'ARG', avatar:null, banner:null},
-    settings:{grad1:'#7c5cff', grad2:'#0a1931', device:'desktop'},
-    admin:{unlocked:false},
+    profile: {name:'DT IPFT', color:'#f2c230', desc:'Estratega polar. Cazador de auroras.', pronouns:'él/he', follows:'ARG', avatar:null, banner:null},
+    settings: {grad1:'#7c5cff', grad2:'#0a1931', device:'desktop'},
+    admin: {unlocked:false},
     matches,
     knockout: buildEmptyKnockout(),
-    view:'inicio',
+    view: 'inicio',
   };
 }
 
@@ -95,11 +100,12 @@ function loadState(){
     const raw = localStorage.getItem('mundial2042_state_v1');
     if(raw){
       const parsed = JSON.parse(raw);
-      // merge with defaults to survive schema changes
       const base = defaultState();
       return Object.assign(base, parsed, {matches: parsed.matches || base.matches, knockout: parsed.knockout || base.knockout});
     }
-  }catch(e){ /* ignore */ }
+  }catch(e){
+    console.warn('Error loading state:', e);
+  }
   return defaultState();
 }
 
@@ -108,16 +114,32 @@ function saveState(){
     localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE));
     return true;
   }catch(e){
-    return false; // storage unavailable or quota exceeded (e.g. GIF too heavy)
+    console.error('Storage error:', e);
+    return false;
   }
 }
 
+/* ============ UTILITY FUNCTIONS ============ */
 function teamByCode(code){ return TEAM_DATA.find(t=>t.code===code); }
 function teamLabel(code){ const t=teamByCode(code); return t ? `${t.flag} ${t.name}` : '???'; }
 function teamFlag(code){ const t=teamByCode(code); return t ? t.flag : '🏳'; }
 function teamName(code){ const t=teamByCode(code); return t ? t.name : '???'; }
 
-/* ---------------- Standings ---------------- */
+/* ============ TOAST NOTIFICATIONS ============ */
+function showToast(message, type='info', duration=3000) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease-out';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+/* ============ STANDINGS ============ */
 function computeStandings(group){
   const teams = TEAM_DATA.filter(t=>t.group===group);
   const table = {};
@@ -144,14 +166,17 @@ function computeStandings(group){
 function groupComplete(group){
   return STATE.matches.filter(m=>m.group===group).every(m=> m.hs!==null && m.as!==null && m.hs!=='' && m.as!=='');
 }
+
 function allGroupsComplete(){ return GROUP_LETTERS.every(groupComplete); }
+
 function playedCount(){ return STATE.matches.filter(m=>m.hs!==null && m.as!==null && m.hs!=='' && m.as!=='').length; }
 
-/* ---------------- Router / Render ---------------- */
+/* ============ ROUTER / RENDER ============ */
 const content = document.getElementById('content');
 
 function setView(view){
   STATE.view = view;
+  saveState();
   document.querySelectorAll('.nav-item').forEach(b=> b.classList.toggle('active', b.dataset.view===view));
   document.querySelectorAll('.bn-item').forEach(b=> b.classList.toggle('active', b.dataset.view===view));
   render();
@@ -178,499 +203,278 @@ function updateSideProgress(){
   document.getElementById('sideProgressText').textContent = `${played}/${total} Partidos`;
   document.getElementById('sideProgressFill').style.width = `${(played/total*100).toFixed(1)}%`;
 }
+
 function updateAdminDot(){
   const dot = document.getElementById('adminDot');
   dot.classList.toggle('off', false);
   dot.style.background = STATE.admin.unlocked ? 'var(--success)' : 'var(--gold)';
 }
 
-/* ---------------- INICIO ---------------- */
+/* ============ RENDER: INICIO ============ */
 function renderInicio(){
   const clasificados = GROUP_LETTERS.filter(groupComplete).length * 2;
   const played = playedCount();
-  const groupsHtml = GROUP_LETTERS.slice(0,4).map(g=>{
-    const st = computeStandings(g);
-    return `
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">Grupo ${g}</div>
-        <span class="badge ${groupComplete(g)?'on':''}">${groupComplete(g)?'Completo':'Pendiente'}</span>
-      </div>
-      <table>
-        <tbody>
-        ${st.map(r=>`<tr><td class="team-cell"><span class="flag">${teamFlag(r.code)}</span>${teamName(r.code)}</td><td class="num pts-cell">${r.pts} pts</td></tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-  }).join('');
-
+  const total = STATE.matches.length;
+  const progPercent = (played/total*100).toFixed(0);
+  
   return `
-  <div class="hero">
-    <h1>BIENVENIDO AL <span>HIELO ETERNO</span></h1>
-    <p>Mundial 2042 se juega en estadios climatizados bajo auroras. 32 naciones, -12°C, gloria infinita. Administra resultados, vive el cuadro, honra la historia.</p>
-  </div>
+    <div class="hero">
+      <h1 class="page-title">
+        <span>⛸ MUNDIAL 2042</span>
+        <span class="badge highlight">Hielo Eterno</span>
+      </h1>
+      <p style="color:var(--muted); font-size:15px; margin:0 0 24px;">
+        Torneo internacional de fútbol en la era glacial. Fase de grupos en curso.
+      </p>
+    </div>
 
-  <div class="stat-grid">
-    <div class="stat-card"><div class="stat-value">32</div><div class="stat-label">Equipos</div></div>
-    <div class="stat-card"><div class="stat-value">8</div><div class="stat-label">Grupos</div></div>
-    <div class="stat-card"><div class="stat-value">${clasificados}</div><div class="stat-label">Clasificados</div></div>
-    <div class="stat-card"><div class="stat-value">${played}/${STATE.matches.length}</div><div class="stat-label">Partidos jugados</div></div>
-  </div>
-
-  <div class="page-title" style="font-size:20px;margin-bottom:14px;">Vista rápida de grupos</div>
-  <div class="group-preview-grid">${groupsHtml}</div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Partidos</div>
+        <div class="stat-value">${played}/${total}</div>
+        <div class="stat-sub">Progreso: ${progPercent}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Grupos Completos</div>
+        <div class="stat-value">${GROUP_LETTERS.filter(groupComplete).length}/8</div>
+        <div class="stat-sub">Fase de Grupos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Clasificados</div>
+        <div class="stat-value">${clasificados}/16</div>
+        <div class="stat-sub">A Cuartos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tu perfil</div>
+        <div class="stat-value">${STATE.profile.name.substring(0,4)}</div>
+        <div class="stat-sub"><a href="javascript:openProfile()" style="color:var(--teal); text-decoration:none;">Editar</a></div>
+      </div>
+    </div>
   `;
 }
 
-/* ---------------- GRUPOS ---------------- */
+/* ============ RENDER: GRUPOS ============ */
 function renderGrupos(){
-  const editable = STATE.admin.unlocked;
-  const groupsHtml = GROUP_LETTERS.map(g=>{
-    const st = computeStandings(g);
-    const matches = STATE.matches.filter(m=>m.group===g);
-    return `
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">Grupo ${g}</div>
-        <span class="badge ${groupComplete(g)?'on':''}">${groupComplete(g)?'✓ Completo':'Pendiente'}</span>
+  let html = `<div class="page-title">Fase de Grupos</div>`;
+  
+  GROUP_LETTERS.forEach(group=>{
+    html += `<div style="margin-bottom:40px;">
+      <h2 style="font-size:20px; margin:0 0 16px; font-family:var(--font-display); color:var(--gold);">Grupo ${group}</h2>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+        ${renderGroupMatches(group)}
       </div>
-      <table>
-        <thead><tr>
-          <th>Equipo</th><th class="num">PJ</th><th class="num">PG</th><th class="num">PE</th><th class="num">PP</th><th class="num">GF</th><th class="num">GC</th><th class="num">PTS</th>
-        </tr></thead>
-        <tbody>
-        ${st.map((r,i)=>`<tr class="${i<2?'qualified':''}">
-          <td class="team-cell"><span class="flag">${teamFlag(r.code)}</span>${teamName(r.code)}</td>
-          <td class="num">${r.pj}</td><td class="num">${r.pg}</td><td class="num">${r.pe}</td><td class="num">${r.pp}</td>
-          <td class="num">${r.gf}</td><td class="num">${r.gc}</td><td class="num pts-cell">${r.pts}</td>
-        </tr>`).join('')}
-        </tbody>
-      </table>
-      <div class="match-list">
-        ${matches.map(m=>`
-          <div class="match-row" data-match="${m.id}">
-            <div class="match-team"><span class="flag">${teamFlag(m.home)}</span>${teamName(m.home)}</div>
-            <div class="score-box">
-              <input class="score-input" type="number" min="0" max="20" data-side="hs" data-id="${m.id}" value="${m.hs??''}" placeholder="-" ${editable?'':'disabled'}>
-              <span class="vs-label">VS</span>
-              <input class="score-input" type="number" min="0" max="20" data-side="as" data-id="${m.id}" value="${m.as??''}" placeholder="-" ${editable?'':'disabled'}>
-            </div>
-            <div class="match-team right">${teamName(m.away)}<span class="flag">${teamFlag(m.away)}</span></div>
-          </div>
-        `).join('')}
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+        <table style="width:100%; font-size:12px;">
+          <thead>
+            <tr style="color:var(--muted); font-family:var(--font-mono);">
+              <th style="text-align:left; padding:8px 0;">Equipo</th>
+              <th style="text-align:center; padding:8px;">PJ</th>
+              <th style="text-align:center; padding:8px;">GF</th>
+              <th style="text-align:center; padding:8px;">GC</th>
+              <th style="text-align:center; padding:8px;">PTS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${computeStandings(group).map((t,i)=>`
+              <tr style="border-top:1px solid var(--line);">
+                <td style="padding:8px 0;"><strong>${i+1}. ${teamFlag(t.code)} ${teamName(t.code)}</strong></td>
+                <td style="text-align:center; padding:8px;">${t.pj}</td>
+                <td style="text-align:center; padding:8px;">${t.gf}</td>
+                <td style="text-align:center; padding:8px;">${t.gc}</td>
+                <td style="text-align:center; padding:8px; font-weight:700; color:var(--gold);">${t.pts}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     </div>`;
-  }).join('');
+  });
+  
+  return html;
+}
 
-  return `
-  <h1 class="page-title">Fase de Grupos ${editable?'':'<span class="badge">MODO TV</span>'}</h1>
-  <div class="group-preview-grid">${groupsHtml}</div>
-  `;
+function renderGroupMatches(group){
+  return STATE.matches.filter(m=>m.group===group).map(m=>`
+    <div style="background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="text-align:center;">
+          <div style="font-weight:600; font-size:13px;">${teamFlag(m.home)} ${teamName(m.home)}</div>
+        </div>
+        <div style="font-family:var(--font-display); font-weight:700; font-size:20px; color:var(--teal);">
+          ${m.hs !== null ? `${m.hs} - ${m.as}` : 'VS'}
+        </div>
+        <div style="text-align:center;">
+          <div style="font-weight:600; font-size:13px;">${teamFlag(m.away)} ${teamName(m.away)}</div>
+        </div>
+      </div>
+      <input type="text" data-match="${m.id}" data-score="home" placeholder="0" style="width:48%; padding:8px; font-size:14px; margin-right:4%;" value="${m.hs || ''}">
+      <input type="text" data-match="${m.id}" data-score="away" placeholder="0" style="width:48%; padding:8px; font-size:14px;" value="${m.as || ''}">
+    </div>
+  `).join('');
 }
 
 function attachGrupoEvents(){
-  content.querySelectorAll('.score-input').forEach(inp=>{
-    inp.addEventListener('input', (e)=>{
-      const id = e.target.dataset.id, side = e.target.dataset.side;
-      const m = STATE.matches.find(mm=>mm.id===id);
-      const val = e.target.value;
-      m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
-      saveState();
-      updateSideProgress();
+  document.querySelectorAll('input[data-match]').forEach(input=>{
+    input.addEventListener('change', (e)=>{
+      const matchId = e.target.dataset.match;
+      const score = e.target.dataset.score;
+      const value = e.target.value.trim();
+      
+      const match = STATE.matches.find(m=>m.id===matchId);
+      if(match){
+        if(score==='home') match.hs = value === '' ? null : value;
+        else match.as = value === '' ? null : value;
+        saveState();
+        render();
+      }
     });
   });
 }
 
-/* ---------------- CUADRO ELIMINACIÓN ---------------- */
-function bTeamRow(m, side){
-  const name = side==='home' ? m.homeName : m.awayName;
-  const score = side==='home' ? m.hs : m.as;
-  const otherScore = side==='home' ? m.as : m.hs;
-  const isWinner = (score!==null && otherScore!==null && score!=='' && otherScore!=='' && Number(score)>Number(otherScore));
-  const label = name ? teamLabel(name) : '???';
-  const editable = STATE.admin.unlocked && name;
-  return `<div class="bteam ${isWinner?'winner':''}">
-    <span class="tname">${label}</span>
-    <input class="bscore" type="number" min="0" max="20" data-match="${m.id}" data-side="${side}" value="${score??''}" placeholder="-" ${editable?'':'disabled'}>
-  </div>`;
-}
-
+/* ============ RENDER: CUADRO ============ */
 function renderCuadro(){
-  const K = STATE.knockout;
-  const editable = STATE.admin.unlocked;
-
-  const col = (label, items) => `
-    <div class="bracket-col">
-      <div class="bcol-label">${label}</div>
-      ${items.map(m=>`<div class="bmatch">${bTeamRow(m,'home')}${bTeamRow(m,'away')}</div>`).join('')}
-    </div>`;
-
-  const champion = (K.final.hs!==null && K.final.as!==null && K.final.hs!=='' && K.final.as!=='')
-    ? (Number(K.final.hs)>Number(K.final.as) ? K.final.homeName : (Number(K.final.as)>Number(K.final.hs) ? K.final.awayName : null))
-    : null;
-
-  return `
-  <h1 class="page-title">Cuadro de Eliminación ${editable?'':'<span class="badge">MODO TV</span>'}</h1>
-  <div class="panel">
-    <div class="bracket-actions">
-      <button class="btn-primary" id="genBracket" ${editable?'':'disabled'}>Generar cuadro desde grupos</button>
-      <button class="btn-secondary" id="resetBracket" ${editable?'':'disabled'}>Vaciar cuadro</button>
-    </div>
-    <div class="bracket-wrap">
-      <div class="bracket">
-        ${col('Ronda de 16 · P49-P52', [K.r16[0],K.r16[1],K.r16[2],K.r16[3]])}
-        ${col('Cuartos', [K.qf[0],K.qf[1]])}
-        <div class="bracket-col">
-          <div class="bcol-label">Semifinal</div>
-          <div class="bmatch">${bTeamRow(K.sf[0],'home')}${bTeamRow(K.sf[0],'away')}</div>
-        </div>
-        <div class="bracket-col">
-          <div class="champion-box">
-            <div class="champion-label">WORLD CHAMPION</div>
-            <div class="champion-name">${champion ? teamLabel(champion) : '???'}</div>
-          </div>
-          <div class="bmatch">
-            <div class="bcol-label" style="margin:8px 0 0;">Final</div>
-            ${bTeamRow(K.final,'home')}${bTeamRow(K.final,'away')}
-          </div>
-          <div class="trophy">🏆</div>
-          <div class="bronze-box">
-            <div class="bronze-label">TERCER PUESTO</div>
-            ${bTeamRow(K.bronze,'home')}${bTeamRow(K.bronze,'away')}
-          </div>
-        </div>
-        <div class="bracket-col">
-          <div class="bcol-label">Semifinal</div>
-          <div class="bmatch">${bTeamRow(K.sf[1],'home')}${bTeamRow(K.sf[1],'away')}</div>
-        </div>
-        ${col('Cuartos', [K.qf[2],K.qf[3]])}
-        ${col('Ronda de 16 · P53-P56', [K.r16[4],K.r16[5],K.r16[6],K.r16[7]])}
-      </div>
-    </div>
-    <p style="padding:0 20px 20px;color:var(--muted);font-size:12px;">Todo en ??? hasta terminar grupos · Estilo oficial Hielo Eterno.</p>
-  </div>
-  `;
+  return `<div class="page-title">Cuadro de Eliminación</div><p style="color:var(--muted);">Sección Cuadro - Próximamente</p>`;
 }
 
-function attachCuadroEvents(){
-  content.querySelectorAll('.bscore').forEach(inp=>{
-    inp.addEventListener('input', (e)=>{
-      const id = e.target.dataset.match, side = e.target.dataset.side;
-      const m = findKnockoutMatch(id);
-      const val = e.target.value;
-      m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
-      propagateBracket();
-      saveState();
-      render();
-    });
-  });
-  const genBtn = document.getElementById('genBracket');
-  if(genBtn) genBtn.addEventListener('click', generateBracketFromGroups);
-  const resetBtn = document.getElementById('resetBracket');
-  if(resetBtn) resetBtn.addEventListener('click', ()=>{
-    if(confirm('¿Vaciar todo el cuadro de eliminación?')){
-      STATE.knockout = buildEmptyKnockout();
-      saveState(); render();
-    }
-  });
-}
+function attachCuadroEvents(){}
 
-function findKnockoutMatch(id){
-  const K = STATE.knockout;
-  return [...K.r16, ...K.qf, ...K.sf, K.final, K.bronze].find(m=>m.id===id);
-}
-
-function matchWinner(m){
-  if(m.hs===null||m.as===null||m.hs===''||m.as==='') return null;
-  const hs=Number(m.hs), as=Number(m.as);
-  if(hs>as) return m.homeName;
-  if(as>hs) return m.awayName;
-  return null;
-}
-function matchLoser(m){
-  if(m.hs===null||m.as===null||m.hs===''||m.as==='') return null;
-  const hs=Number(m.hs), as=Number(m.as);
-  if(hs>as) return m.awayName;
-  if(as>hs) return m.homeName;
-  return null;
-}
-
-function propagateBracket(){
-  const K = STATE.knockout;
-  // r16 -> qf  (P49+P50 -> QF1, P51+P52 -> QF2, P53+P54 -> QF3, P55+P56 -> QF4)
-  const pairs = [[0,1,0],[2,3,1],[4,5,2],[6,7,3]];
-  pairs.forEach(([a,b,qi])=>{
-    K.qf[qi].homeName = matchWinner(K.r16[a]);
-    K.qf[qi].awayName = matchWinner(K.r16[b]);
-  });
-  // qf -> sf
-  K.sf[0].homeName = matchWinner(K.qf[0]);
-  K.sf[0].awayName = matchWinner(K.qf[1]);
-  K.sf[1].homeName = matchWinner(K.qf[2]);
-  K.sf[1].awayName = matchWinner(K.qf[3]);
-  // sf -> final / bronze
-  K.final.homeName = matchWinner(K.sf[0]);
-  K.final.awayName = matchWinner(K.sf[1]);
-  K.bronze.homeName = matchLoser(K.sf[0]);
-  K.bronze.awayName = matchLoser(K.sf[1]);
-}
-
-function generateBracketFromGroups(){
-  const winners = {}, runnersup = {};
-  GROUP_LETTERS.forEach(g=>{
-    const st = computeStandings(g);
-    winners[g] = st[0].code;
-    runnersup[g] = st[1].code;
-  });
-  const K = buildEmptyKnockout();
-  // Left side: groups A B C D
-  K.r16[0].homeName = winners['A']; K.r16[0].awayName = runnersup['B']; // P49
-  K.r16[1].homeName = winners['C']; K.r16[1].awayName = runnersup['D']; // P50
-  K.r16[2].homeName = winners['B']; K.r16[2].awayName = runnersup['A']; // P51
-  K.r16[3].homeName = winners['D']; K.r16[3].awayName = runnersup['C']; // P52
-  // Right side: groups E F G H
-  K.r16[4].homeName = winners['E']; K.r16[4].awayName = runnersup['F']; // P53
-  K.r16[5].homeName = winners['G']; K.r16[5].awayName = runnersup['H']; // P54
-  K.r16[6].homeName = winners['F']; K.r16[6].awayName = runnersup['E']; // P55
-  K.r16[7].homeName = winners['H']; K.r16[7].awayName = runnersup['G']; // P56
-  STATE.knockout = K;
-  propagateBracket();
-  saveState();
-  render();
-  if(!allGroupsComplete()){
-    alert('Nota: algunos grupos aún no terminaron. El cuadro se armó con las posiciones actuales y puede cambiar.');
-  }
-}
-
-/* ---------------- SALÓN DE LA FAMA ---------------- */
-function currentChampionEntry(){
-  const K = STATE.knockout;
-  const f = K.final;
-  if(f.hs===null||f.as===null||f.hs===''||f.as==='' || !f.homeName || !f.awayName) return null;
-  const hs=Number(f.hs), as=Number(f.as);
-  if(hs===as) return null;
-  const champCode = hs>as ? f.homeName : f.awayName;
-  const runnerCode = hs>as ? f.awayName : f.homeName;
-  const finalScore = hs>as ? `${hs}-${as} ${teamName(runnerCode)}` : `${as}-${hs} ${teamName(runnerCode)}`;
-  let thirdText = null;
-  const br = K.bronze;
-  if(br.hs!==null && br.as!==null && br.hs!=='' && br.as!=='' && br.homeName && br.awayName){
-    const bhs=Number(br.hs), bas=Number(br.as);
-    if(bhs!==bas){
-      thirdText = bhs>bas ? `${teamName(br.homeName)} ${bhs}-${bas} ${teamName(br.awayName)}` : `${teamName(br.awayName)} ${bas}-${bhs} ${teamName(br.homeName)}`;
-    }
-  }
-  return {year:2042, host:teamName(champCode), flag:teamFlag(champCode), final:finalScore, third:thirdText, balon:null, goleador:null, fairplay:null, star:1, current:true};
-}
-
+/* ============ RENDER: FAMA ============ */
 function renderFama(){
-  const current = currentChampionEntry();
-  const all = [...HISTORY, current || {year:2042, host:null, flag:null, final:null, third:null, pending:true}];
-
-  const cardsHtml = all.map(h=>{
-    if(h.pending){
-      return `
-      <div class="fama-card current">
-        <div class="fama-year-bg">2042</div>
-        <div class="fama-star">☆</div>
-        <div class="fama-year">2042 · MUNDIAL EN CURSO</div>
-        <div class="fama-title">ARGENTINA</div>
-        <div class="fama-result">Torneo en disputa</div>
-        <div class="fama-pending">Completá la final en el Cuadro de Eliminación para revelar al campeón.</div>
-      </div>`;
-    }
-    return `
-    <div class="fama-card ${h.current?'current':''}">
-      <div class="fama-year-bg">${h.year}</div>
-      <div class="fama-flag">${h.flag}</div>
-      ${h.star ? `<div class="fama-star">${'★'.repeat(h.star)}</div>` : ''}
-      <div class="fama-year">${h.year} ${h.host.toUpperCase()}</div>
-      <div class="fama-title">Final</div>
-      <div class="fama-result">${h.final}</div>
-      ${h.third ? `<div class="fama-sub">Tercero ${h.third}</div>` : ''}
-      <div class="fama-tags">
-        <div class="fama-tag ${h.balon?'gold':''}"><div class="fama-tag-label">Balón</div><div class="fama-tag-value">${h.balon||'??? ✔'}</div></div>
-        <div class="fama-tag ${h.goleador?'gold':''}"><div class="fama-tag-label">Goleador</div><div class="fama-tag-value">${h.goleador||'??? ✔'}</div></div>
-        <div class="fama-tag ${h.fairplay?'gold':''}"><div class="fama-tag-label">Fair Play</div><div class="fama-tag-value">${h.fairplay||'??? ✔'}</div></div>
-      </div>
-    </div>`;
-  }).join('');
-
-  const champCounts = {};
-  HISTORY.forEach(h=> champCounts[h.host] = (champCounts[h.host]||0)+1);
-  if(current) champCounts[current.host] = (champCounts[current.host]||0)+1;
-  const chipsHtml = Object.entries(champCounts).map(([name,count])=>{
-    const flagEntry = [...HISTORY, current].find(h=>h && h.host===name);
-    return `<div class="champ-chip">${flagEntry.flag} ${name} ${'★'.repeat(count)}</div>`;
-  }).join('');
-
   return `
-  <h1 class="page-title">Salón de la Fama</h1>
-  <div class="panel" style="padding:18px 20px;margin-bottom:22px;">
-    <div class="panel-title" style="margin-bottom:12px;">Campeones de la historia</div>
-    <div class="champions-strip">${chipsHtml || '<span style="color:var(--muted)">Aún sin campeones registrados.</span>'}</div>
-  </div>
-  <div class="fama-grid">${cardsHtml}</div>
+    <div class="page-title">Salón de la Fama</div>
+    ${HISTORY.map(h=>`
+      <div style="background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+          <div>
+            <div style="font-size:14px; color:var(--muted); margin-bottom:4px;">MUNDIAL 🏆</div>
+            <div style="font-family:var(--font-display); font-weight:700; font-size:24px; margin-bottom:8px;">${h.year}</div>
+            <div style="font-size:14px; margin-bottom:6px;"><strong>Campeón:</strong> ${h.final}</div>
+            ${h.third ? `<div style="font-size:12px; color:var(--muted);">Tercero: ${h.third}</div>` : ''}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:32px; margin-bottom:8px;">${h.flag}</div>
+            <div style="color:var(--muted); font-size:12px;">Sede: ${h.host}</div>
+          </div>
+        </div>
+      </div>
+    `).join('')}
   `;
 }
 
-/* ---------------- AJUSTES ---------------- */
+/* ============ RENDER: AJUSTES ============ */
 function renderAjustes(){
   return `
-  <h1 class="page-title">Ajustes</h1>
-  <div class="panel" style="padding:22px;">
-    <div class="panel-title" style="margin-bottom:16px;">Gradiente de fondo (tiempo real)</div>
-    <div class="color-row">
-      <div class="color-field">
-        <label>Color 1</label>
-        <div class="color-input-wrap">
-          <input type="color" id="setGrad1" value="${STATE.settings.grad1}">
-          <span id="setGrad1Text" style="font-family:var(--font-mono);font-size:12px;">${STATE.settings.grad1}</span>
+    <div class="page-title">Ajustes</div>
+    <div style="background:var(--panel-2); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:16px;">
+      <h3 style="font-size:16px; margin:0 0 14px; font-family:var(--font-display);">Colores & Tema</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+          <label style="display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:1px; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Gradiente 1</label>
+          <input type="color" id="settGrad1" value="${STATE.settings.grad1}" style="width:100%; height:50px; border:1px solid var(--line); border-radius:10px; cursor:pointer;">
         </div>
-      </div>
-      <div class="color-field">
-        <label>Color 2</label>
-        <div class="color-input-wrap">
-          <input type="color" id="setGrad2" value="${STATE.settings.grad2}">
-          <span id="setGrad2Text" style="font-family:var(--font-mono);font-size:12px;">${STATE.settings.grad2}</span>
+        <div>
+          <label style="display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:1px; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Gradiente 2</label>
+          <input type="color" id="settGrad2" value="${STATE.settings.grad2}" style="width:100%; height:50px; border:1px solid var(--line); border-radius:10px; cursor:pointer;">
         </div>
       </div>
     </div>
-    <div class="grad-preview" id="gradPreview" style="background:linear-gradient(90deg, ${STATE.settings.grad1}, ${STATE.settings.grad2});"></div>
-
-    <div class="panel-title" style="margin-bottom:12px;">Dispositivo</div>
-    <div class="device-options">
-      <div class="device-opt ${STATE.settings.device==='desktop'?'active':''}" data-dev="desktop">PC · Sidebar 250px · 2 cols</div>
-      <div class="device-opt ${STATE.settings.device==='mobile'?'active':''}" data-dev="mobile">Celular · Bottom Nav · 1 col</div>
-    </div>
-  </div>
+    <button class="btn-primary" id="btnSaveTheme" style="width:100%;">Guardar Tema</button>
   `;
 }
 
 function attachAjustesEvents(){
-  const g1 = document.getElementById('setGrad1');
-  const g2 = document.getElementById('setGrad2');
-  const preview = document.getElementById('gradPreview');
-  const t1 = document.getElementById('setGrad1Text');
-  const t2 = document.getElementById('setGrad2Text');
-
-  function applyGrad(){
-    document.documentElement.style.setProperty('--grad1', g1.value);
-    document.documentElement.style.setProperty('--grad2', g2.value);
-    preview.style.background = `linear-gradient(90deg, ${g1.value}, ${g2.value})`;
-    t1.textContent = g1.value; t2.textContent = g2.value;
-    STATE.settings.grad1 = g1.value; STATE.settings.grad2 = g2.value;
+  document.getElementById('btnSaveTheme').addEventListener('click', ()=>{
+    STATE.settings.grad1 = document.getElementById('settGrad1').value;
+    STATE.settings.grad2 = document.getElementById('settGrad2').value;
+    document.documentElement.style.setProperty('--grad1', STATE.settings.grad1);
+    document.documentElement.style.setProperty('--grad2', STATE.settings.grad2);
     saveState();
-  }
-  g1.addEventListener('input', applyGrad);
-  g2.addEventListener('input', applyGrad);
-
-  content.querySelectorAll('.device-opt').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      setDevice(el.dataset.dev);
-    });
+    showToast('Tema guardado ✓', 'success');
   });
 }
 
-function setDevice(dev){
-  STATE.settings.device = dev;
-  document.getElementById('btnMobile').classList.toggle('active', dev==='mobile');
-  document.getElementById('btnDesktop').classList.toggle('active', dev==='desktop');
-  document.querySelector('.app').classList.toggle('force-mobile', dev==='mobile');
-  saveState();
-  if(STATE.view==='ajustes') render();
-}
-
-/* ---------------- ADMIN ---------------- */
+/* ============ RENDER: ADMIN ============ */
 function renderAdmin(){
   if(!STATE.admin.unlocked){
     return `
-    <h1 class="page-title">Admin / TV</h1>
-    <div class="admin-lock">
-      <div class="mini-label">MODO TV · Solo visualización</div>
-      <p style="color:var(--muted);font-size:13px;margin-top:6px;">No se pueden editar resultados. Ingresá la clave secreta para desbloquear la edición completa.</p>
-      <input type="text" id="adminKeyInput" placeholder="CLAVE SECRETA" autocomplete="off">
-      <button class="btn-primary full" id="adminUnlock">Ingresar clave secreta</button>
-      <p class="hint" style="margin-top:14px;">Pista: la clave se te compartió junto con esta app.</p>
-    </div>`;
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px;">
+        <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg); padding:40px; text-align:center; max-width:420px;">
+          <div style="font-size:36px; margin-bottom:16px;">⛨</div>
+          <h2 style="font-size:18px; margin-bottom:20px; font-family:var(--font-display);">Acceso de Administrador</h2>
+          <input type="password" id="adminPassInput" placeholder="Ingresa código de acceso" style="width:100%; padding:12px; border:1px solid var(--line); background:var(--bg-void); color:var(--ice); border-radius:10px; text-align:center; letter-spacing:2px; margin-bottom:16px; font-family:var(--font-mono);">
+          <button class="btn-primary full" id="btnUnlockAdmin">Desbloquear</button>
+        </div>
+      </div>
+    `;
   }
+  
   return `
-  <h1 class="page-title">Admin / TV <span class="badge on">Edición desbloqueada</span></h1>
-  <div class="admin-panel">
-    <div class="admin-box">
-      <h3>Generar cuadro</h3>
-      <p>Arma automáticamente la ronda de 16 usando los 2 primeros de cada grupo.</p>
-      <button class="btn-primary" id="adminGen">Generar cuadro desde grupos</button>
+    <div class="page-title">Panel Admin</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+      <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px;">
+        <h3 style="font-family:var(--font-display); margin:0 0 8px; font-size:16px;">Gestión de Datos</h3>
+        <p style="color:var(--muted); font-size:13px; line-height:1.6; margin:0 0 14px;">Descarga o reinicia el estado del torneo.</p>
+        <button class="btn-secondary" id="btnExportData" style="width:100%; margin-bottom:8px;">📥 Exportar JSON</button>
+        <button class="btn-danger" id="btnResetData" style="width:100%;">🔄 Reiniciar Todo</button>
+      </div>
+      <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px;">
+        <h3 style="font-family:var(--font-display); margin:0 0 8px; font-size:16px;">Estado del Torneo</h3>
+        <p style="color:var(--muted); font-size:13px; line-height:1.6; margin:0 0 14px;">Partidos jugados: ${playedCount()}/${STATE.matches.length}</p>
+        <button class="btn-secondary" id="btnCheckDB" style="width:100%; margin-bottom:8px;">🔍 Ver Estado</button>
+        <button class="btn-secondary" id="btnLogOut" style="width:100%;">🔒 Cerrar Sesión Admin</button>
+      </div>
     </div>
-    <div class="admin-box">
-      <h3>Reiniciar torneo</h3>
-      <p>Borra todos los resultados de grupos y el cuadro de eliminación. No se puede deshacer.</p>
-      <button class="btn-danger" id="adminReset">Reiniciar todo el torneo</button>
-    </div>
-    <div class="admin-box">
-      <h3>Exportar datos</h3>
-      <p>Descarga un archivo JSON con el estado actual del torneo (resultados, cuadro y perfil).</p>
-      <button class="btn-secondary" id="adminExport">Descargar JSON</button>
-    </div>
-    <div class="admin-box">
-      <h3>Bloquear edición</h3>
-      <p>Volver a Modo TV: solo lectura, sin poder tocar resultados.</p>
-      <button class="btn-secondary" id="adminLock">Volver a Modo TV</button>
-    </div>
-  </div>`;
+  `;
 }
 
 function attachAdminEvents(){
-  const unlockBtn = document.getElementById('adminUnlock');
-  if(unlockBtn){
-    unlockBtn.addEventListener('click', tryUnlock);
-    document.getElementById('adminKeyInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
-  }
-  const genBtn = document.getElementById('adminGen');
-  if(genBtn) genBtn.addEventListener('click', generateBracketFromGroups);
-  const resetBtn = document.getElementById('adminReset');
-  if(resetBtn) resetBtn.addEventListener('click', ()=>{
-    if(confirm('¿Seguro que querés reiniciar TODO el torneo? Esta acción no se puede deshacer.')){
-      const kept = {profile: STATE.profile, settings: STATE.settings, admin: STATE.admin};
-      STATE = Object.assign(defaultState(), kept);
-      saveState(); render();
-    }
-  });
-  const exportBtn = document.getElementById('adminExport');
-  if(exportBtn) exportBtn.addEventListener('click', exportData);
-  const lockBtn = document.getElementById('adminLock');
-  if(lockBtn) lockBtn.addEventListener('click', ()=>{ STATE.admin.unlocked=false; saveState(); render(); });
-}
-
-function tryUnlock(){
-  const val = document.getElementById('adminKeyInput').value.trim().toUpperCase();
-  if(val === ADMIN_KEY){
-    STATE.admin.unlocked = true;
-    saveState();
-    render();
+  if(!STATE.admin.unlocked){
+    document.getElementById('btnUnlockAdmin').addEventListener('click', ()=>{
+      const pass = document.getElementById('adminPassInput').value;
+      if(pass === ADMIN_KEY){
+        STATE.admin.unlocked = true;
+        saveState();
+        render();
+        showToast('Admin desbloqueado ✓', 'success');
+      }else{
+        showToast('Código incorrecto', 'error');
+        document.getElementById('adminPassInput').value = '';
+      }
+    });
   }else{
-    const inp = document.getElementById('adminKeyInput');
-    inp.style.borderColor = 'var(--danger)';
-    inp.value='';
-    inp.placeholder='CLAVE INCORRECTA';
-    setTimeout(()=>{ inp.style.borderColor=''; inp.placeholder='CLAVE SECRETA'; }, 1400);
+    document.getElementById('btnExportData').addEventListener('click', exportData);
+    document.getElementById('btnResetData').addEventListener('click', ()=>{
+      if(confirm('¿Estás seguro? Esto borrará todo.')){
+        STATE = defaultState();
+        saveState();
+        render();
+        showToast('Datos reiniciados', 'success');
+      }
+    });
+    document.getElementById('btnLogOut').addEventListener('click', ()=>{
+      STATE.admin.unlocked = false;
+      saveState();
+      render();
+      showToast('Sesión cerrada', 'success');
+    });
   }
 }
 
+/* ============ EXPORT / DOWNLOAD ============ */
 function exportData(){
-  const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
+  const json = JSON.stringify(STATE, null, 2);
+  const blob = new Blob([json], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'mundial-2042-datos.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  a.href = url;
+  a.download = `mundial2042_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
   URL.revokeObjectURL(url);
+  showToast('Descargado ✓', 'success');
 }
 
-/* ---------------- PROFILE MODAL ---------------- */
+/* ============ PROFILE MODAL ============ */
 const profileModal = document.getElementById('profileModal');
-const MAX_IMAGE_MB = 3;
-
-// undefined = no change made this session, null = explicitly cleared, string = new dataURL
 let pendingAvatar = undefined;
 let pendingBanner = undefined;
 
@@ -691,12 +495,18 @@ function openProfile(){
   refreshUploadUI();
   updatePreview();
   profileModal.classList.add('open');
+  profileModal.setAttribute('aria-hidden', 'false');
 }
-function closeProfile(){ profileModal.classList.remove('open'); }
+
+function closeProfile(){
+  profileModal.classList.remove('open');
+  profileModal.setAttribute('aria-hidden', 'true');
+}
 
 function currentAvatarSrc(){
   return pendingAvatar !== undefined ? pendingAvatar : STATE.profile.avatar;
 }
+
 function currentBannerSrc(){
   return pendingBanner !== undefined ? pendingBanner : STATE.profile.banner;
 }
@@ -723,14 +533,17 @@ function refreshUploadUI(){
 
 function readImageFile(file, onDone){
   if(!file) return;
-  if(!file.type.startsWith('image/')){ alert('Elegí un archivo de imagen (GIF, PNG o JPG).'); return; }
-  if(file.size > MAX_IMAGE_MB * 1024 * 1024){
-    alert(`La imagen pesa más de ${MAX_IMAGE_MB}MB. Elegí un GIF más liviano para que se pueda guardar en el navegador.`);
+  if(!file.type.startsWith('image/')){ 
+    showToast('Elegí un archivo de imagen', 'error');
+    return;
+  }
+  if(file.size > MAX_IMAGE_SIZE){
+    showToast(`Imagen muy pesada. Máximo ${MAX_IMAGE_MB}MB`, 'error');
     return;
   }
   const reader = new FileReader();
   reader.onload = (e)=> onDone(e.target.result);
-  reader.onerror = ()=> alert('No se pudo leer el archivo. Probá con otra imagen.');
+  reader.onerror = ()=> showToast('Error al leer archivo', 'error');
   reader.readAsDataURL(file);
 }
 
@@ -740,17 +553,20 @@ document.getElementById('inAvatarFile').addEventListener('change', (e)=>{
     refreshUploadUI();
   });
 });
+
 document.getElementById('inBannerFile').addEventListener('change', (e)=>{
   readImageFile(e.target.files[0], (dataUrl)=>{
     pendingBanner = dataUrl;
     refreshUploadUI();
   });
 });
+
 document.getElementById('clearAvatar').addEventListener('click', ()=>{
   pendingAvatar = null;
   document.getElementById('inAvatarFile').value = '';
   refreshUploadUI();
 });
+
 document.getElementById('clearBanner').addEventListener('click', ()=>{
   pendingBanner = null;
   document.getElementById('inBannerFile').value = '';
@@ -798,7 +614,9 @@ document.getElementById('saveProfile').addEventListener('click', ()=>{
   const ok = saveState();
   closeProfile();
   if(ok === false){
-    alert('El perfil se aplicó pero no se pudo guardar en el navegador (la imagen puede ser muy pesada). Probá con un GIF más liviano.');
+    showToast('Perfil guardado pero imagen muy pesada', 'warning');
+  }else{
+    showToast('Perfil guardado ✓', 'success');
   }
   if(STATE.view==='ajustes') render();
 });
@@ -818,45 +636,56 @@ function applyAvatar(){
   }
 }
 
-/* ---------------- Top bar actions ---------------- */
+/* ============ DEVICE TOGGLE ============ */
+function setDevice(device){
+  STATE.settings.device = device;
+  saveState();
+  document.querySelector('.app').classList.toggle('force-mobile', device==='mobile');
+  document.getElementById('btnMobile').classList.toggle('active', device==='mobile');
+  document.getElementById('btnDesktop').classList.toggle('active', device==='desktop');
+  document.getElementById('btnMobile').setAttribute('aria-pressed', device==='mobile');
+  document.getElementById('btnDesktop').setAttribute('aria-pressed', device==='desktop');
+}
+
+/* ============ TOP BAR ACTIONS ============ */
 document.getElementById('btnMobile').addEventListener('click', ()=> setDevice('mobile'));
 document.getElementById('btnDesktop').addEventListener('click', ()=> setDevice('desktop'));
 
 document.getElementById('btnShare').addEventListener('click', async ()=>{
   const text = `Mundial 2042 · Hielo Eterno — ${playedCount()}/${STATE.matches.length} partidos jugados. ¡Seguí el torneo!`;
   try{
-    if(navigator.share){ await navigator.share({title:'Mundial 2042', text}); return; }
+    if(navigator.share){
+      await navigator.share({title:'Mundial 2042', text});
+      return;
+    }
   }catch(e){ /* user cancelled */ }
   try{
     await navigator.clipboard.writeText(text);
-    flashButton('btnShare', 'Copiado ✓');
-  }catch(e){ alert(text); }
+    showToast('Copiado al portapapeles ✓', 'success');
+  }catch(e){
+    showToast(text, 'info');
+  }
 });
 
 document.getElementById('btnDownload').addEventListener('click', exportData);
 
-function flashButton(id, msg){
-  const btn = document.getElementById(id);
-  const original = btn.textContent;
-  btn.textContent = msg;
-  setTimeout(()=> btn.textContent = original, 1400);
-}
-
-/* ---------------- Sidebar / bottomnav nav wiring ---------------- */
 document.querySelectorAll('.nav-item, .bn-item').forEach(btn=>{
   btn.addEventListener('click', ()=> setView(btn.dataset.view));
 });
 
-/* ---------------- Init ---------------- */
+/* ============ INIT ============ */
 function init(){
   document.documentElement.style.setProperty('--grad1', STATE.settings.grad1);
   document.documentElement.style.setProperty('--grad2', STATE.settings.grad2);
   document.querySelector('.app').classList.toggle('force-mobile', STATE.settings.device==='mobile');
   document.getElementById('btnMobile').classList.toggle('active', STATE.settings.device==='mobile');
   document.getElementById('btnDesktop').classList.toggle('active', STATE.settings.device==='desktop');
+  document.getElementById('btnMobile').setAttribute('aria-pressed', STATE.settings.device==='mobile');
+  document.getElementById('btnDesktop').setAttribute('aria-pressed', STATE.settings.device==='desktop');
   applyAvatar();
   bindProfileLiveUpdate();
   render();
+  console.log('🎮 Mundial 2042 initialized');
 }
 
 init();
