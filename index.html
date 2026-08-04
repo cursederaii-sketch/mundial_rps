@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MUNDIAL 2042 · Hielo Eterno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="aurora-bg" aria-hidden="true">
+  <span class="ribbon r1"></span>
+  <span class="ribbon r2"></span>
+  <span class="ribbon r3"></span>
+  <span class="stars"></span>
+</div>
+
+<div class="app">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">❄</div>
+      <div class="brand-text">
+        <div class="brand-name">MUNDIAL 2042</div>
+        <div class="brand-sub">HIELO ETERNO · EDICIÓN POLAR</div>
+      </div>
+    </div>
+
+    <div class="device-toggle" role="tablist" aria-label="Vista de dispositivo">
+      <button class="dt-btn" data-device="mobile" id="btnMobile">Celular</button>
+      <button class="dt-btn active" data-device="desktop" id="btnDesktop">PC</button>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn-ghost" id="btnShare">Compartir</button>
+      <button class="btn-ghost icon-btn" id="btnDownload" title="Exportar datos">⇩</button>
+      <button class="avatar-btn" id="btnAvatar" title="Perfil"><span id="avatarInitial">D</span></button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+      <button class="nav-item active" data-view="inicio">
+        <span class="nav-ico">◆</span> Inicio
+      </button>
+      <button class="nav-item" data-view="grupos">
+        <span class="nav-ico">▤</span> Fase Grupos
+      </button>
+      <button class="nav-item" data-view="cuadro">
+        <span class="nav-ico">⌘</span> Cuadro Eliminación
+      </button>
+      <button class="nav-item" data-view="fama">
+        <span class="nav-ico">★</span> Salón Fama
+      </button>
+      <button class="nav-item" data-view="ajustes">
+        <span class="nav-ico">⚙</span> Ajustes
+      </button>
+      <button class="nav-item" data-view="admin">
+        <span class="nav-ico">⛨</span> Admin
+        <span class="dot" id="adminDot"></span>
+      </button>
+
+      <div class="side-card">
+        <div class="side-card-label">Torneo</div>
+        <div class="side-card-value" id="sideProgressText">0/48 Partidos</div>
+        <div class="progress-track"><div class="progress-fill" id="sideProgressFill"></div></div>
+      </div>
+    </nav>
+
+    <!-- BOTTOM NAV (mobile) -->
+    <nav class="bottomnav" id="bottomnav">
+      <button class="bn-item active" data-view="inicio"><span>◆</span>Inicio</button>
+      <button class="bn-item" data-view="grupos"><span>▤</span>Grupos</button>
+      <button class="bn-item" data-view="cuadro"><span>⌘</span>Cuadro</button>
+      <button class="bn-item" data-view="fama"><span>★</span>Fama</button>
+      <button class="bn-item" data-view="ajustes"><span>⚙</span>Ajustes</button>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="content" id="content">
+      <!-- rendered by app.js -->
+    </main>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <button class="modal-close" id="closeProfile">✕</button>
+    <div class="modal-hero" id="profileHero">
+      <div class="modal-hero-avatar" id="profileHeroAvatar"></div>
+    </div>
+    <div class="modal-body">
+      <div class="mini-label">PREVIEW EN VIVO</div>
+      <div class="preview-card">
+        <div class="preview-avatar" id="previewAvatar"></div>
+        <div>
+          <div class="preview-name"><span id="previewName">DT IPFT</span><span class="preview-pronouns" id="previewPronouns">él/he</span></div>
+          <div class="preview-desc" id="previewDesc">Estratega polar. Cazador de auroras.</div>
+          <div class="preview-follow">🏳 Sigue a <span id="previewFollows">Argentina</span></div>
+        </div>
+      </div>
+
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Foto Perfil (GIF)</label>
+          <label class="upload-btn" for="inAvatarFile">
+            <span id="avatarUploadLabel">Subir Avatar GIF</span>
+          </label>
+          <input type="file" id="inAvatarFile" accept="image/gif,image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="clearAvatar">Quitar imagen</button>
+        </div>
+        <div class="field">
+          <label class="mini-label">Banner (GIF)</label>
+          <label class="upload-btn" for="inBannerFile">
+            <span id="bannerUploadLabel">Subir Banner GIF</span>
+          </label>
+          <input type="file" id="inBannerFile" accept="image/gif,image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="clearBanner">Quitar imagen</button>
+        </div>
+      </div>
+      <div class="hint" id="uploadHint">Formatos GIF/PNG/JPG · recomendado menor a 2MB (se guarda en este navegador).</div>
+
+      <div class="field-row" style="margin-top:16px;">
+        <div class="field">
+          <label class="mini-label">Nombre + Color</label>
+          <div class="input-with-swatch">
+            <input type="text" id="inName" maxlength="24" value="DT IPFT">
+            <input type="color" id="inColor" value="#f2c230">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Fondo Gradiente 1</label>
+          <input type="color" id="inGrad1b" value="#7c5cff" class="color-block">
+        </div>
+        <div class="field">
+          <label class="mini-label">Fondo Gradiente 2</label>
+          <input type="color" id="inGrad2b" value="#0a1931" class="color-block">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Descripción</label>
+        <textarea id="inDesc" maxlength="80" rows="2">Estratega polar. Cazador de auroras.</textarea>
+      </div>
+
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Pronombres</label>
+          <input type="text" id="inPronouns" value="él/he" maxlength="12">
+        </div>
+        <div class="field">
+          <label class="mini-label">Sigues a</label>
+          <select id="inFollows"></select>
+        </div>
+      </div>
+
+      <div class="hint">🏳 La vista previa usa la bandera del equipo elegido.</div>
+      <button class="btn-primary full" id="saveProfile">Guardar perfil</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
