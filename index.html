@@ -3,12 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="MUNDIAL 2042 · Hielo Eterno - Edición Polar. Gestiona tu torneo con estilo futurista.">
-<meta name="theme-color" content="#05060f">
 <title>MUNDIAL 2042 · Hielo Eterno</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,12 +32,12 @@
     </div>
 
     <div class="device-toggle" role="tablist" aria-label="Vista de dispositivo">
-      <button class="dt-btn" data-device="mobile" id="btnMobile" aria-pressed="false">Celular</button>
-      <button class="dt-btn active" data-device="desktop" id="btnDesktop" aria-pressed="true">PC</button>
+      <button class="dt-btn" data-device="mobile" id="btnMobile">Celular</button>
+      <button class="dt-btn active" data-device="desktop" id="btnDesktop">PC</button>
     </div>
 
     <div class="topbar-actions">
-      <button class="btn-ghost" id="btnShare" title="Compartir torneo">Compartir</button>
+      <button class="btn-ghost" id="btnShare">Compartir</button>
       <button class="btn-ghost icon-btn" id="btnDownload" title="Exportar datos">⇩</button>
       <button class="avatar-btn" id="btnAvatar" title="Perfil"><span id="avatarInitial">D</span></button>
     </div>
@@ -85,21 +84,21 @@
     </nav>
 
     <!-- MAIN CONTENT -->
-    <main class="content" id="content" role="main">
+    <main class="content" id="content">
       <!-- rendered by app.js -->
     </main>
   </div>
 </div>
 
 <!-- PROFILE MODAL -->
-<div class="modal-overlay" id="profileModal" role="dialog" aria-labelledby="profileTitle" aria-hidden="true">
+<div class="modal-overlay" id="profileModal">
   <div class="modal">
-    <button class="modal-close" id="closeProfile" aria-label="Cerrar perfil">✕</button>
+    <button class="modal-close" id="closeProfile">✕</button>
     <div class="modal-hero" id="profileHero">
       <div class="modal-hero-avatar" id="profileHeroAvatar"></div>
     </div>
     <div class="modal-body">
-      <div class="mini-label" id="profileTitle">PREVIEW EN VIVO</div>
+      <div class="mini-label">PREVIEW EN VIVO</div>
       <div class="preview-card">
         <div class="preview-avatar" id="previewAvatar"></div>
         <div>
@@ -115,7 +114,7 @@
           <label class="upload-btn" for="inAvatarFile">
             <span id="avatarUploadLabel">Subir Avatar GIF</span>
           </label>
-          <input type="file" id="inAvatarFile" accept="image/gif,image/png,image/jpeg" style="display:none;">
+          <input type="file" id="inAvatarFile" accept="image/gif,image/*" style="display:none;">
           <button type="button" class="btn-mini-clear" id="clearAvatar">Quitar imagen</button>
         </div>
         <div class="field">
@@ -123,7 +122,7 @@
           <label class="upload-btn" for="inBannerFile">
             <span id="bannerUploadLabel">Subir Banner GIF</span>
           </label>
-          <input type="file" id="inBannerFile" accept="image/gif,image/png,image/jpeg" style="display:none;">
+          <input type="file" id="inBannerFile" accept="image/gif,image/*" style="display:none;">
           <button type="button" class="btn-mini-clear" id="clearBanner">Quitar imagen</button>
         </div>
       </div>
@@ -171,9 +170,6 @@
     </div>
   </div>
 </div>
-
-<!-- TOAST NOTIFICATIONS -->
-<div class="toast-container" id="toastContainer"></div>
 
 <script src="app.js"></script>
 </body>
