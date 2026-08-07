@@ -11,3 +11,6 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+/* GIPHY API key — pegá la tuya acá */
+const GIPHY_API_KEY = "GlVGYHkr3WSBnllca54iNt0yFbjz7L65";

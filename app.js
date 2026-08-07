@@ -472,9 +472,14 @@ function openChat(tag){
     const msgs = Object.values(val).sort((a,b)=> a.ts-b.ts);
     const box = document.getElementById('chatMessages');
     if(!box) return;
-    box.innerHTML = msgs.map(m=>`
-      <div class="chat-msg ${m.from===MY_TAG?'mine':'theirs'}">${escapeHtml(m.text)}<span class="chat-msg-time">${new Date(m.ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</span></div>
-    `).join('');
+    box.innerHTML = msgs.map(m=>{
+      const time = new Date(m.ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      const mine = m.from===MY_TAG?'mine':'theirs';
+      if(m.type==='gif'){
+        return `<div class="chat-msg ${mine} gif-msg"><img src="${m.text}" alt="gif" loading="lazy"><span class="chat-msg-time">${time}</span></div>`;
+      }
+      return `<div class="chat-msg ${mine}">${escapeHtml(m.text)}<span class="chat-msg-time">${time}</span></div>`;
+    }).join('');
     box.scrollTop = box.scrollHeight;
   };
   ref.on('value', handler);
@@ -491,6 +496,56 @@ function sendChatMessage(){
   bumpMsgCount();
   input.value = '';
 }
+
+/* ---------------- GIFs (GIPHY) ---------------- */
+let gifSearchTimer = null;
+function toggleGifPanel(){
+  const panel = document.getElementById('gifPanel');
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  if(opening){
+    document.getElementById('gifSearchInput').value = '';
+    loadGifs('futbol');
+    document.getElementById('gifSearchInput').focus();
+  }
+}
+function loadGifs(query){
+  const grid = document.getElementById('gifPanelGrid');
+  if(!grid) return;
+  if(typeof GIPHY_API_KEY==='undefined' || !GIPHY_API_KEY){
+    grid.innerHTML = '<div class="gif-panel-empty">Falta configurar la API key de GIPHY.</div>';
+    return;
+  }
+  grid.innerHTML = '<div class="gif-panel-empty">Buscando…</div>';
+  const endpoint = query ? 'search' : 'trending';
+  const url = `https://api.giphy.com/v1/gifs/${endpoint}?api_key=${GIPHY_API_KEY}&limit=12&rating=pg-13${query?`&q=${encodeURIComponent(query)}`:''}`;
+  fetch(url).then(r=>r.json()).then(data=>{
+    const items = data.data || [];
+    if(!items.length){ grid.innerHTML = '<div class="gif-panel-empty">Sin resultados.</div>'; return; }
+    grid.innerHTML = items.map(g=>{
+      const preview = g.images.fixed_width_small.url;
+      const full = g.images.fixed_width.url;
+      return `<img src="${preview}" data-full="${full}" loading="lazy">`;
+    }).join('');
+    grid.querySelectorAll('img').forEach(img=>{
+      img.addEventListener('click', ()=> sendGif(img.dataset.full));
+    });
+  }).catch(()=>{ grid.innerHTML = '<div class="gif-panel-empty">Error al buscar GIFs.</div>'; });
+}
+function sendGif(url){
+  if(!ACTIVE_CHAT_FRIEND || typeof db==='undefined') return;
+  const chatId = [MY_TAG, ACTIVE_CHAT_FRIEND].sort().join('__');
+  db.ref('social/chats/'+chatId+'/messages').push({from: MY_TAG, text: url, type:'gif', ts: Date.now()});
+  bumpMsgCount();
+  document.getElementById('gifPanel').classList.remove('open');
+}
+document.getElementById('chatGifBtn').addEventListener('click', toggleGifPanel);
+document.getElementById('gifCloseBtn').addEventListener('click', ()=> document.getElementById('gifPanel').classList.remove('open'));
+document.getElementById('gifSearchInput').addEventListener('input', (e)=>{
+  clearTimeout(gifSearchTimer);
+  const q = e.target.value.trim();
+  gifSearchTimer = setTimeout(()=> loadGifs(q || 'futbol'), 400);
+});
 
 /* ---------------- Predicciones ---------------- */
 function savePrediction(matchId, hs, as){

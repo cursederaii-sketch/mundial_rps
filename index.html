@@ -249,7 +249,15 @@
         <div class="chat-active" id="chatActive" style="display:none;">
           <div class="chat-active-header" id="chatActiveHeader"></div>
           <div class="chat-messages" id="chatMessages"></div>
+          <div class="gif-panel" id="gifPanel">
+            <div class="gif-panel-search">
+              <input type="text" id="gifSearchInput" placeholder="Buscar GIF…" maxlength="60">
+              <button class="btn-mini-clear" id="gifCloseBtn">✕</button>
+            </div>
+            <div class="gif-panel-grid" id="gifPanelGrid"></div>
+          </div>
           <div class="chat-input-row">
+            <button class="btn-ghost icon-btn" id="chatGifBtn" title="Enviar GIF">GIF</button>
             <input type="text" id="chatInput" maxlength="500" placeholder="Escribí un mensaje…">
             <button class="btn-primary" id="chatSendBtn">➤</button>
           </div>
