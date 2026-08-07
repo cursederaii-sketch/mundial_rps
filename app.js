@@ -179,11 +179,19 @@ function loadState(){
 function saveState(){
   try{
     localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE));
-    syncToFirebase();
     return true;
   }catch(e){
     return false; // storage unavailable or quota exceeded (e.g. GIF too heavy)
   }
+}
+
+/* Use this instead of saveState() for any edit that actually touches
+   `matches` or `knockout` (score inputs, bracket generation/reset, etc.)
+   — it saves locally AND pushes the change live to Firebase. Profile,
+   settings and admin unlock should keep using plain saveState(). */
+function saveTournament(){
+  saveState();
+  syncToFirebase();
 }
 
 /* ---------------- Firebase live sync ----------------
@@ -232,6 +240,13 @@ function initFirebaseSync(){
 function syncToFirebase(){
   if(applyingRemote) return; // this save came from a remote update, don't echo it back
   if(!fbRef) return;
+  if(!fbReady){
+    // We haven't received the server's current data yet — pushing now could
+    // overwrite everyone else's live scores with stale/old local data.
+    // Once the first remote snapshot arrives, retry.
+    setTimeout(syncToFirebase, 300);
+    return;
+  }
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
@@ -404,7 +419,7 @@ function attachGrupoEvents(){
       const m = STATE.matches.find(mm=>mm.id===id);
       const val = e.target.value;
       m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
-      saveState();
+      saveTournament();
       updateSideProgress();
     });
   });
@@ -489,7 +504,7 @@ function attachCuadroEvents(){
       const val = e.target.value;
       m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
       propagateBracket();
-      saveState();
+      saveTournament();
       render();
     });
   });
@@ -499,7 +514,7 @@ function attachCuadroEvents(){
   if(resetBtn) resetBtn.addEventListener('click', ()=>{
     if(confirm('¿Vaciar todo el cuadro de eliminación?')){
       STATE.knockout = buildEmptyKnockout();
-      saveState(); render();
+      saveTournament(); render();
     }
   });
 }
@@ -588,7 +603,7 @@ function generateBracketFromGroups(){
   K.r16[7].homeName = winners['H']; K.r16[7].awayName = runnersup['G']; // P56
   STATE.knockout = K;
   propagateBracket();
-  saveState();
+  saveTournament();
   render();
   if(!allGroupsComplete()){
     alert('Nota: algunos grupos aún no terminaron. El cuadro se armó con las posiciones actuales y puede cambiar.');
@@ -1184,7 +1199,7 @@ function attachAdminEvents(){
     if(confirm('¿Seguro que querés reiniciar TODO el torneo? Esta acción no se puede deshacer.')){
       const kept = {profile: STATE.profile, settings: STATE.settings, admin: STATE.admin};
       STATE = Object.assign(defaultState(), kept);
-      saveState(); render();
+      saveTournament(); render();
     }
   });
   const exportBtn = document.getElementById('adminExport');
