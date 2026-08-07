@@ -179,10 +179,66 @@ function loadState(){
 function saveState(){
   try{
     localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE));
+    syncToFirebase();
     return true;
   }catch(e){
     return false; // storage unavailable or quota exceeded (e.g. GIF too heavy)
   }
+}
+
+/* ---------------- Firebase live sync ----------------
+   Only `matches` and `knockout` are shared across every viewer — profile,
+   settings and admin unlock stay local to each device/browser. */
+let fbRef = null;
+let fbReady = false;
+let applyingRemote = false; // guard to avoid feedback loops
+let syncTimer = null;
+
+function setLiveStatus(on, label){
+  const dot = document.getElementById('liveDot');
+  const text = document.getElementById('liveText');
+  if(!dot || !text) return;
+  dot.classList.toggle('on', !!on);
+  text.textContent = label || (on ? 'EN VIVO' : 'Sin conexión');
+}
+
+function initFirebaseSync(){
+  if(typeof firebase === 'undefined' || typeof db === 'undefined'){
+    setLiveStatus(false, 'Sin conexión');
+    return;
+  }
+  fbRef = db.ref('tournament');
+
+  // Connection state (Firebase's built-in presence sentinel).
+  db.ref('.info/connected').on('value', (snap)=>{
+    if(snap.val()===true) setLiveStatus(true, 'EN VIVO');
+    else setLiveStatus(false, 'Reconectando…');
+  });
+
+  // Listen for remote changes and merge them into local STATE live.
+  fbRef.on('value', (snap)=>{
+    const remote = snap.val();
+    fbReady = true;
+    if(!remote) return; // nothing in the DB yet — local state will seed it below
+    applyingRemote = true;
+    if(remote.matches) STATE.matches = remote.matches;
+    if(remote.knockout) STATE.knockout = remote.knockout;
+    try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
+    render();
+    applyingRemote = false;
+  });
+}
+
+function syncToFirebase(){
+  if(applyingRemote) return; // this save came from a remote update, don't echo it back
+  if(!fbRef) return;
+  clearTimeout(syncTimer);
+  // small debounce so rapid score typing doesn't spam the DB
+  syncTimer = setTimeout(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout }).catch(()=>{
+      setLiveStatus(false, 'Error de sync');
+    });
+  }, 250);
 }
 
 function teamByCode(code){ return TEAM_DATA.find(t=>t.code===code); }
@@ -1352,6 +1408,7 @@ function init(){
   applyAvatar();
   bindProfileLiveUpdate();
   render();
+  initFirebaseSync();
 }
 
 init();
