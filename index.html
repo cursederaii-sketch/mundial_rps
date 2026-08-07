@@ -170,8 +170,75 @@
       </div>
 
       <div class="hint">🏳 La vista previa usa la bandera del equipo elegido.</div>
+
+      <div class="field-row two" style="margin-top:16px;">
+        <div class="field">
+          <label class="mini-label">Rol</label>
+          <div id="profileRoleBadge" class="role-badge">Novato</div>
+        </div>
+        <div class="field">
+          <label class="mini-label">Tu código de amigo</label>
+          <div class="my-tag-row"><span id="profileTagValue">—</span></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Logros</label>
+        <div id="achvGrid" class="achv-grid"></div>
+      </div>
+
       <button class="btn-primary full" id="saveProfile">Guardar perfil</button>
     </div>
+  </div>
+</div>
+
+<!-- CHAT FAB -->
+<button class="chat-fab" id="chatFab" title="Chat">
+  <img src="chat-icon.png" alt="Chat" class="chat-fab-img">
+  <span class="chat-fab-badge" id="chatFabBadge"></span>
+</button>
+
+<!-- CHAT PANEL -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-panel-header">
+    <div class="chat-tabs">
+      <button class="chat-tab active" data-ctab="chat">Chat</button>
+      <button class="chat-tab" data-ctab="predicciones">Predicciones</button>
+    </div>
+    <button class="chat-panel-close" id="chatPanelClose">✕</button>
+  </div>
+
+  <div class="chat-tab-content" id="ctabChat">
+    <div class="chat-body">
+      <aside class="chat-friends" id="chatFriends">
+        <div class="chat-my-tag">
+          <div class="mini-label">TU CÓDIGO</div>
+          <div class="my-tag-row"><span id="myTagValue">—</span><button class="btn-mini-clear" id="copyTag">Copiar</button></div>
+        </div>
+        <div class="add-friend-row">
+          <input type="text" id="addFriendInput" placeholder="Código (DT-4821)" maxlength="12">
+          <button class="btn-mini-clear-solid" id="addFriendBtn">＋</button>
+        </div>
+        <div id="friendRequests"></div>
+        <div class="mini-label" style="margin-top:12px;">AMIGOS</div>
+        <div id="friendList" class="friend-list"></div>
+      </aside>
+      <section class="chat-main">
+        <div class="chat-empty" id="chatEmpty">Elegí un amigo para chatear.</div>
+        <div class="chat-active" id="chatActive" style="display:none;">
+          <div class="chat-active-header" id="chatActiveHeader"></div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input-row">
+            <input type="text" id="chatInput" maxlength="500" placeholder="Escribí un mensaje…">
+            <button class="btn-primary" id="chatSendBtn">➤</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="chat-tab-content" id="ctabPredicciones" style="display:none;">
+    <div id="predictionsList" class="predictions-list"></div>
   </div>
 </div>
 

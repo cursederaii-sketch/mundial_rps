@@ -274,6 +274,311 @@ function syncToFirebase(){
   }, 250);
 }
 
+/* =========================================================
+   SISTEMA SOCIAL — amigos, chat privado, predicciones y logros
+   ========================================================= */
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function getMyTag(){
+  let t = localStorage.getItem('mundial2042_tag');
+  if(!t){
+    t = 'DT-' + Math.floor(1000 + Math.random()*9000);
+    localStorage.setItem('mundial2042_tag', t);
+  }
+  return t;
+}
+const MY_TAG = getMyTag();
+let MY_FRIENDS = {};
+let FRIEND_REQUESTS_IN = {};
+let FRIEND_NAMES = {};
+let MY_PREDICTIONS = {};
+let ACTIVE_CHAT_FRIEND = null;
+let chatMsgsRefOff = null;
+
+function getMsgCount(){ return Number(localStorage.getItem('mundial2042_msgcount')||0); }
+function bumpMsgCount(){ localStorage.setItem('mundial2042_msgcount', String(getMsgCount()+1)); }
+
+function correctPredictionsCount(){
+  return STATE.matches.filter(m=>{
+    const p = MY_PREDICTIONS[m.id];
+    return p && isPlayed(m) && Number(p.hs)===Number(m.hs) && Number(p.as)===Number(m.as);
+  }).length;
+}
+
+/* ---------------- Logros y rol ---------------- */
+const ACHIEVEMENTS = [
+  {id:'first_match', icon:'⚽', name:'Primer Partido', check:()=> playedCount()>=1},
+  {id:'groups_done', icon:'▤', name:'Grupos Completos', check:()=> allGroupsComplete()},
+  {id:'champion', icon:'🏆', name:'Campeón Coronado', check:()=> !!(STATE.knockout.final && hasScore(STATE.knockout.final.hs))},
+  {id:'social', icon:'🤝', name:'Sociable', check:()=> Object.keys(MY_FRIENDS).length>=1},
+  {id:'circle', icon:'❄', name:'Círculo de Hielo', check:()=> Object.keys(MY_FRIENDS).length>=5},
+  {id:'icebreaker', icon:'💬', name:'Rompehielos', check:()=> getMsgCount()>=1},
+  {id:'oracle', icon:'🔮', name:'Oráculo Polar', check:()=> correctPredictionsCount()>=1},
+  {id:'visionary', icon:'🌟', name:'Visionario', check:()=> correctPredictionsCount()>=5},
+  {id:'fanatic', icon:'🎖', name:'Fanático Total', check:()=> playedCount()>=STATE.matches.length && STATE.matches.length>0},
+];
+
+function computeAchievements(){ return ACHIEVEMENTS.map(a=>({...a, unlocked: !!a.check()})); }
+
+function roleForCount(n){
+  if(n>=8) return 'DT Supremo';
+  if(n>=6) return 'Leyenda';
+  if(n>=4) return 'Estratega';
+  if(n>=2) return 'Hincha';
+  return 'Novato';
+}
+
+function renderAchievements(){
+  const grid = document.getElementById('achvGrid');
+  if(!grid) return;
+  const list = computeAchievements();
+  grid.innerHTML = list.map(a=>`
+    <div class="achv-item ${a.unlocked?'unlocked':''}">
+      <span class="achv-icon">${a.icon}</span>
+      <span class="achv-name">${a.name}</span>
+    </div>
+  `).join('');
+  const unlocked = list.filter(a=>a.unlocked).length;
+  const roleEl = document.getElementById('profileRoleBadge');
+  if(roleEl) roleEl.textContent = roleForCount(unlocked);
+  const tagEl = document.getElementById('profileTagValue');
+  if(tagEl) tagEl.textContent = MY_TAG;
+}
+
+/* ---------------- Amigos ---------------- */
+function ensureMySocialProfile(){
+  if(typeof db==='undefined') return;
+  db.ref('social/users/'+MY_TAG).update({name: STATE.profile.name, color: STATE.profile.color, lastSeen: Date.now()});
+}
+
+function updateChatBadge(){
+  const badge = document.getElementById('chatFabBadge');
+  if(!badge) return;
+  const n = Object.keys(FRIEND_REQUESTS_IN||{}).length;
+  badge.textContent = n;
+  badge.classList.toggle('show', n>0);
+}
+
+function renderFriendRequests(){
+  const box = document.getElementById('friendRequests');
+  if(!box) return;
+  const entries = Object.entries(FRIEND_REQUESTS_IN||{});
+  box.innerHTML = entries.map(([tag,data])=>`
+    <div class="friend-req-item">
+      <div class="friend-req-name">${escapeHtml((data&&data.name)||tag)} <span style="color:var(--muted-2)">(${escapeHtml(tag)})</span></div>
+      <div class="friend-req-actions">
+        <button class="fr-accept" data-tag="${tag}">Aceptar</button>
+        <button class="fr-decline" data-tag="${tag}">Ignorar</button>
+      </div>
+    </div>
+  `).join('');
+  box.querySelectorAll('.fr-accept').forEach(b=> b.addEventListener('click', ()=> acceptFriendRequest(b.dataset.tag)));
+  box.querySelectorAll('.fr-decline').forEach(b=> b.addEventListener('click', ()=> declineFriendRequest(b.dataset.tag)));
+}
+
+function renderFriendList(){
+  const list = document.getElementById('friendList');
+  if(!list) return;
+  const tags = Object.keys(MY_FRIENDS||{});
+  if(tags.length===0){
+    list.innerHTML = '<div class="empty-note" style="padding:8px 4px;">Sin amigos todavía.</div>';
+    return;
+  }
+  list.innerHTML = tags.map(t=>`
+    <button class="friend-item ${ACTIVE_CHAT_FRIEND===t?'active':''}" data-tag="${t}">
+      <span class="friend-dot"></span>${escapeHtml(FRIEND_NAMES[t]||t)}
+    </button>
+  `).join('');
+  list.querySelectorAll('.friend-item').forEach(btn=> btn.addEventListener('click', ()=> openChat(btn.dataset.tag)));
+  tags.forEach(t=>{
+    if(!FRIEND_NAMES[t] && typeof db!=='undefined'){
+      db.ref('social/users/'+t).once('value').then(snap=>{
+        const v = snap.val();
+        FRIEND_NAMES[t] = (v && v.name) || t;
+        renderFriendList();
+      }).catch(()=>{});
+    }
+  });
+}
+
+function sendFriendRequest(targetTag){
+  if(typeof db==='undefined'){ alert('Sin conexión.'); return; }
+  db.ref('social/users/'+targetTag).once('value').then(snap=>{
+    if(!snap.exists()){ alert('Ese código no existe. Revisá que esté bien escrito.'); return; }
+    if(MY_FRIENDS[targetTag]){ alert('Ya son amigos.'); return; }
+    db.ref(`social/requests/${targetTag}/${MY_TAG}`).set({name: STATE.profile.name, ts: Date.now()});
+    alert('Solicitud enviada ✓');
+  }).catch(()=> alert('No se pudo enviar la solicitud.'));
+}
+
+function acceptFriendRequest(fromTag){
+  if(typeof db==='undefined') return;
+  db.ref(`social/friends/${MY_TAG}/${fromTag}`).set(true);
+  db.ref(`social/friends/${fromTag}/${MY_TAG}`).set(true);
+  db.ref(`social/requests/${MY_TAG}/${fromTag}`).remove();
+}
+
+function declineFriendRequest(fromTag){
+  if(typeof db==='undefined') return;
+  db.ref(`social/requests/${MY_TAG}/${fromTag}`).remove();
+}
+
+/* ---------------- Chat privado ---------------- */
+function openChat(tag){
+  ACTIVE_CHAT_FRIEND = tag;
+  renderFriendList();
+  document.getElementById('chatEmpty').style.display = 'none';
+  document.getElementById('chatActive').style.display = 'flex';
+  document.getElementById('chatActiveHeader').textContent = FRIEND_NAMES[tag] || tag;
+  if(chatMsgsRefOff){ chatMsgsRefOff(); chatMsgsRefOff = null; }
+  if(typeof db==='undefined') return;
+  const chatId = [MY_TAG, tag].sort().join('__');
+  const ref = db.ref('social/chats/'+chatId+'/messages').limitToLast(200);
+  const handler = (snap)=>{
+    const val = snap.val() || {};
+    const msgs = Object.values(val).sort((a,b)=> a.ts-b.ts);
+    const box = document.getElementById('chatMessages');
+    if(!box) return;
+    box.innerHTML = msgs.map(m=>`
+      <div class="chat-msg ${m.from===MY_TAG?'mine':'theirs'}">${escapeHtml(m.text)}<span class="chat-msg-time">${new Date(m.ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</span></div>
+    `).join('');
+    box.scrollTop = box.scrollHeight;
+  };
+  ref.on('value', handler);
+  chatMsgsRefOff = ()=> ref.off('value', handler);
+}
+
+function sendChatMessage(){
+  if(!ACTIVE_CHAT_FRIEND || typeof db==='undefined') return;
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim().slice(0,500);
+  if(!text) return;
+  const chatId = [MY_TAG, ACTIVE_CHAT_FRIEND].sort().join('__');
+  db.ref('social/chats/'+chatId+'/messages').push({from: MY_TAG, text, ts: Date.now()});
+  bumpMsgCount();
+  input.value = '';
+}
+
+/* ---------------- Predicciones ---------------- */
+function savePrediction(matchId, hs, as){
+  if(typeof db==='undefined') return;
+  db.ref(`social/predictions/${MY_TAG}/${matchId}`).set({hs: Number(hs), as: Number(as)});
+}
+
+function renderPredictions(){
+  const box = document.getElementById('predictionsList');
+  if(!box) return;
+  let html = '';
+  GROUP_LETTERS.forEach(g=>{
+    const ms = STATE.matches.filter(m=>m.group===g);
+    if(ms.length===0) return;
+    html += `<div class="pred-group-label">GRUPO ${g}</div>`;
+    ms.forEach(m=>{
+      const p = MY_PREDICTIONS[m.id];
+      const teamsLabel = `${teamFlag(m.home)} ${teamFlag(m.away)} <span style="font-size:11px;color:var(--muted)">${teamName(m.home)} vs ${teamName(m.away)}</span>`;
+      if(isPlayed(m)){
+        let resultIcon = '';
+        if(p){
+          const correct = Number(p.hs)===Number(m.hs) && Number(p.as)===Number(m.as);
+          resultIcon = `<span class="pred-result ${correct?'correct':'wrong'}">${correct?'✓':'✗'}</span>`;
+        }
+        html += `<div class="pred-item">
+          <div class="pred-teams">${teamsLabel}</div>
+          <div style="font-size:11px;color:var(--muted)">${p?`${p.hs}-${p.as}`:'—'} · Real ${m.hs}-${m.as}</div>
+          ${resultIcon}
+        </div>`;
+      }else{
+        html += `<div class="pred-item">
+          <div class="pred-teams">${teamsLabel}</div>
+          <div class="pred-inputs">
+            <input type="number" min="0" max="20" id="predH_${m.id}" value="${p?p.hs:''}">
+            <span>-</span>
+            <input type="number" min="0" max="20" id="predA_${m.id}" value="${p?p.as:''}">
+          </div>
+          <button class="pred-save" data-id="${m.id}">Guardar</button>
+        </div>`;
+      }
+    });
+  });
+  box.innerHTML = html || '<div class="empty-note">No hay partidos todavía.</div>';
+  box.querySelectorAll('.pred-save').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.id;
+      const hs = document.getElementById('predH_'+id).value;
+      const as = document.getElementById('predA_'+id).value;
+      if(hs==='' || as===''){ alert('Completá ambos resultados.'); return; }
+      savePrediction(id, hs, as);
+      const orig = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(()=> btn.textContent = orig, 1200);
+    });
+  });
+}
+
+/* ---------------- Init social + wiring ---------------- */
+function initSocial(){
+  if(typeof firebase==='undefined' || typeof db==='undefined') return;
+  ensureMySocialProfile();
+  db.ref('social/friends/'+MY_TAG).on('value', snap=>{
+    MY_FRIENDS = snap.val() || {};
+    renderFriendList();
+    updateChatBadge();
+    renderAchievements();
+  });
+  db.ref('social/requests/'+MY_TAG).on('value', snap=>{
+    FRIEND_REQUESTS_IN = snap.val() || {};
+    renderFriendRequests();
+    updateChatBadge();
+  });
+  db.ref('social/predictions/'+MY_TAG).on('value', snap=>{
+    MY_PREDICTIONS = snap.val() || {};
+    const activeTab = document.querySelector('.chat-tab.active');
+    if(activeTab && activeTab.dataset.ctab==='predicciones') renderPredictions();
+    renderAchievements();
+  });
+}
+
+document.getElementById('chatFab').addEventListener('click', ()=>{
+  const panel = document.getElementById('chatPanel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')){
+    document.getElementById('myTagValue').textContent = MY_TAG;
+    renderFriendList();
+    renderFriendRequests();
+  }
+});
+document.getElementById('chatPanelClose').addEventListener('click', ()=> document.getElementById('chatPanel').classList.remove('open'));
+
+document.querySelectorAll('.chat-tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.chat-tab').forEach(b=> b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.ctab;
+    document.getElementById('ctabChat').style.display = tab==='chat' ? 'flex' : 'none';
+    document.getElementById('ctabPredicciones').style.display = tab==='predicciones' ? 'flex' : 'none';
+    if(tab==='predicciones') renderPredictions();
+  });
+});
+
+document.getElementById('addFriendBtn').addEventListener('click', ()=>{
+  const inp = document.getElementById('addFriendInput');
+  const val = inp.value.trim().toUpperCase();
+  if(!val) return;
+  if(val===MY_TAG){ alert('Ese es tu propio código.'); return; }
+  sendFriendRequest(val);
+  inp.value = '';
+});
+document.getElementById('addFriendInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('addFriendBtn').click(); });
+
+document.getElementById('copyTag').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText(MY_TAG); flashButton('copyTag','✓'); }catch(e){ alert(MY_TAG); }
+});
+
+document.getElementById('chatSendBtn').addEventListener('click', sendChatMessage);
+document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChatMessage(); });
+
 function teamByCode(code){ return TEAM_DATA.find(t=>t.code===code); }
 function teamLabel(code){ const t=teamByCode(code); return t ? `<span class="inline-flag">${flagImg(code,'w40')}</span> ${t.name}` : '???'; }
 function teamFlag(code){ return flagImg(code,'w40'); }
@@ -504,7 +809,7 @@ function renderCuadro(){
             <div class="bcol-label" style="margin:8px 0 0;">Final</div>
             ${bTeamRow(K.final,'home')}${bTeamRow(K.final,'away')}
           </div>
-          <div class="trophy">🏆</div>
+          <div class="trophy">${assetImg('assets/mundiales/trophy.png','Copa del Mundo','trophy-img')}<span class="trophy-fallback">🏆</span></div>
           <div class="bronze-box">
             <div class="bronze-label">TERCER PUESTO</div>
             ${bTeamRow(K.bronze,'home')}${bTeamRow(K.bronze,'away')}
@@ -1283,6 +1588,7 @@ function openProfile(){
   document.getElementById('inBannerFile').value = '';
   refreshUploadUI();
   updatePreview();
+  renderAchievements();
   profileModal.classList.add('open');
 }
 function closeProfile(){ profileModal.classList.remove('open'); }
@@ -1388,6 +1694,7 @@ document.getElementById('saveProfile').addEventListener('click', ()=>{
   document.documentElement.style.setProperty('--grad1', STATE.settings.grad1);
   document.documentElement.style.setProperty('--grad2', STATE.settings.grad2);
   applyAvatar();
+  ensureMySocialProfile();
   const ok = saveState();
   closeProfile();
   if(ok === false){
@@ -1451,6 +1758,7 @@ function init(){
   bindProfileLiveUpdate();
   render();
   initFirebaseSync();
+  initSocial();
 }
 
 init();
