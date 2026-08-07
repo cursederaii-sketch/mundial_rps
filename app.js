@@ -102,18 +102,30 @@ const HISTORY = [
     ]}},
   {year:2030, champion:'Alemania', runnerUp:'Francia', finalScore:[2,1], third:'Estados Unidos', fourth:'España', thirdScore:[3,2], balon:null, goleador:null, fairplay:null},
   {year:2034, champion:'España', runnerUp:'Ghana', finalScore:[3,2], third:'Colombia', fourth:'México', thirdScore:[3,2], balon:'Julian Alvarez', goleador:'Julian Alvarez', fairplay:'Ghana'},
-  {year:2038, champion:'Argentina', runnerUp:'Alemania', finalScore:[3,1], third:null, fourth:null, thirdScore:null, balon:'Nico Paz', goleador:'Nico Paz', fairplay:'Argentina',
+  {year:2038, champion:'Argentina', runnerUp:'Inglaterra', finalScore:[3,0], third:'Costa Rica', fourth:'Uruguay', thirdScore:[3,1], balon:'Nico Paz', goleador:'Nico Paz', fairplay:'Argentina',
     group:{label:'GRUPO F', teams:[
       {name:'Argentina', pj:3,g:2,e:1,p:0,gf:7,gc:2,pts:7},
       {name:'Croacia', pj:3,g:2,e:1,p:0,gf:6,gc:2,pts:7},
       {name:'Japón', pj:3,g:1,e:0,p:2,gf:3,gc:5,pts:3},
       {name:'Canadá', pj:3,g:0,e:0,p:3,gf:3,gc:8,pts:0},
     ]},
+    /* Bracket matches the official IPFT World Cup 2038 poster exactly:
+       Argentina's road was Senegal -> Italia -> Costa Rica -> Inglaterra (3-0),
+       and Costa Rica beat Uruguay 3-1 for third place. */
     bracket:{
-      r16:[['Países Bajos',1,'México',0], ['Argentina',3,'Croacia',1], ['Brasil',2,'Dinamarca',1], ['Francia',2,'Inglaterra',1],
-           ['España',1,'Marruecos',0], ['Portugal',3,'Japón',1], ['Alemania',2,'Canadá',0], ['Uruguay',1,'Colombia',0]],
-      qf:[['Países Bajos',0,'Argentina',2], ['Brasil',1,'Francia',3], ['España',2,'Portugal',1], ['Alemania',2,'Uruguay',1]],
-      sf:[['Argentina',2,'Francia',1], ['España',1,'Alemania',1,'away']],
+      r16:[
+        ['Holanda',2,'Bélgica',1], ['Uruguay',2,'Colombia',0],
+        ['Inglaterra',3,'Australia',1], ['Egipto',1,'Japón',0],
+        ['Costa Rica',2,'España',1], ['Croacia',2,'Corea del Sur',0],
+        ['Argentina',3,'Senegal',1], ['Italia',2,'Portugal',1],
+      ],
+      qf:[
+        ['Uruguay',1,'Holanda',0], ['Inglaterra',2,'Egipto',1],
+        ['Costa Rica',1,'Croacia',0], ['Argentina',2,'Italia',0],
+      ],
+      sf:[
+        ['Inglaterra',2,'Uruguay',1], ['Argentina',3,'Costa Rica',1],
+      ],
     }},
 ];
 
@@ -668,18 +680,23 @@ function allHallEntries(){
   return current ? [...HISTORY, current] : HISTORY;
 }
 
+/* Every champion has taken part in all 5 World Cups held so far (6 once
+   2042 is added). Germany is the one exception — missed one edition. */
+const PARTICIPATION_OVERRIDES = { 'Alemania': 4 };
+
 function countryStats(name){
   const all = allHallEntries();
   const titles = all.filter(h=>h.champion===name);
   const subs = all.filter(h=>h.runnerUp===name);
   const thirds = all.filter(h=>h.third===name);
   const latestTitle = titles.length ? Math.max(...titles.map(h=>h.year)) : null;
+  const totalEditions = HISTORY.length + (currentChampionEntry() ? 1 : 0);
   return {
     titles: titles.length, subs: subs.length, thirds: thirds.length,
     years: titles.map(h=>h.year).sort((a,b)=>b-a),
     latestTitle,
     isVigente: latestTitle === Math.max(...all.map(h=>h.year)),
-    participaciones: 8 + titles.length*2 + subs.length, // decorative fictional figure
+    participaciones: PARTICIPATION_OVERRIDES[name] !== undefined ? PARTICIPATION_OVERRIDES[name] : totalEditions,
   };
 }
 
