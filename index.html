@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MUNDIAL 2042 · Hielo Eterno</title>
+<meta name="description" content="Mundial 2042 · Hielo Eterno — seguí la fase de grupos, el cuadro de eliminación, chateá con amigos y predecí los resultados del torneo en vivo.">
+<link rel="icon" type="image/png" href="assets/mundiales/trophy.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -188,6 +190,25 @@
       </div>
 
       <button class="btn-primary full" id="saveProfile">Guardar perfil</button>
+    </div>
+  </div>
+</div>
+
+<!-- FRIEND PROFILE MODAL -->
+<div class="modal-overlay" id="friendProfileModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" id="closeFriendProfile">✕</button>
+    <div class="modal-hero" id="friendProfileHero">
+      <div class="modal-hero-avatar" id="friendProfileAvatar"></div>
+    </div>
+    <div class="modal-body">
+      <div class="preview-name" style="font-size:18px;"><span id="fpName">—</span><span class="preview-pronouns" id="fpPronouns"></span></div>
+      <div class="preview-desc" id="fpDesc" style="margin:8px 0;"></div>
+      <div class="preview-follow" id="fpFollows" style="margin-bottom:14px;"></div>
+      <div class="mini-label">CÓDIGO</div>
+      <div class="my-tag-row" id="fpTag" style="margin-bottom:14px;">—</div>
+      <div class="mini-label">ROL</div>
+      <div id="fpRole" class="role-badge">Novato</div>
     </div>
   </div>
 </div>

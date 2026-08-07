@@ -350,8 +350,35 @@ function renderAchievements(){
 /* ---------------- Amigos ---------------- */
 function ensureMySocialProfile(){
   if(typeof db==='undefined') return;
-  db.ref('social/users/'+MY_TAG).update({name: STATE.profile.name, color: STATE.profile.color, lastSeen: Date.now()});
+  db.ref('social/users/'+MY_TAG).update({
+    name: STATE.profile.name,
+    color: STATE.profile.color,
+    desc: STATE.profile.desc,
+    pronouns: STATE.profile.pronouns,
+    follows: STATE.profile.follows,
+    role: roleForCount(computeAchievements().filter(a=>a.unlocked).length),
+    lastSeen: Date.now()
+  });
 }
+
+function openFriendProfile(tag){
+  if(!tag || typeof db==='undefined') return;
+  db.ref('social/users/'+tag).once('value').then(snap=>{
+    const v = snap.val() || {};
+    document.getElementById('fpName').textContent = v.name || tag;
+    document.getElementById('fpPronouns').textContent = v.pronouns || '';
+    document.getElementById('fpDesc').textContent = v.desc || '';
+    document.getElementById('fpFollows').textContent = v.follows ? `🏳 Sigue a ${teamName(v.follows)}` : '';
+    document.getElementById('fpTag').textContent = tag;
+    document.getElementById('fpRole').textContent = v.role || 'Novato';
+    const heroColor = v.color || '#8b6bff';
+    document.getElementById('friendProfileHero').style.background = `linear-gradient(135deg, ${heroColor}, #1a1400)`;
+    document.getElementById('friendProfileAvatar').style.background = `linear-gradient(135deg, ${heroColor}, #1a1400)`;
+    document.getElementById('friendProfileModal').classList.add('open');
+  }).catch(()=>{});
+}
+document.getElementById('closeFriendProfile').addEventListener('click', ()=> document.getElementById('friendProfileModal').classList.remove('open'));
+document.getElementById('friendProfileModal').addEventListener('click', (e)=>{ if(e.target.id==='friendProfileModal') document.getElementById('friendProfileModal').classList.remove('open'); });
 
 function updateChatBadge(){
   const badge = document.getElementById('chatFabBadge');
@@ -431,7 +458,11 @@ function openChat(tag){
   renderFriendList();
   document.getElementById('chatEmpty').style.display = 'none';
   document.getElementById('chatActive').style.display = 'flex';
-  document.getElementById('chatActiveHeader').textContent = FRIEND_NAMES[tag] || tag;
+  const chatHeaderEl = document.getElementById('chatActiveHeader');
+  chatHeaderEl.textContent = FRIEND_NAMES[tag] || tag;
+  chatHeaderEl.style.cursor = 'pointer';
+  chatHeaderEl.title = 'Ver perfil';
+  chatHeaderEl.onclick = ()=> openFriendProfile(tag);
   if(chatMsgsRefOff){ chatMsgsRefOff(); chatMsgsRefOff = null; }
   if(typeof db==='undefined') return;
   const chatId = [MY_TAG, tag].sort().join('__');
