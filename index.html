@@ -199,7 +199,7 @@
   <div class="modal" style="max-width:380px;">
     <button class="modal-close" id="closeFriendProfile">✕</button>
     <div class="modal-hero" id="friendProfileHero">
-      <div class="modal-hero-avatar" id="friendProfileAvatar"></div>
+      <div class="modal-hero-avatar" id="friendProfileAvatar"><span id="fpAvatarInitial"></span></div>
     </div>
     <div class="modal-body">
       <div class="preview-name" style="font-size:18px;"><span id="fpName">—</span><span class="preview-pronouns" id="fpPronouns"></span></div>
@@ -209,6 +209,25 @@
       <div class="my-tag-row" id="fpTag" style="margin-bottom:14px;">—</div>
       <div class="mini-label">ROL</div>
       <div id="fpRole" class="role-badge">Novato</div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP CREATE MODAL -->
+<div class="modal-overlay" id="groupModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" id="closeGroupModal">✕</button>
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="mini-label">NUEVO GRUPO</div>
+      <div class="field">
+        <label class="mini-label">Nombre del grupo</label>
+        <input type="text" id="groupNameInput" maxlength="30" placeholder="Ej: Los Rompehielos">
+      </div>
+      <div class="field">
+        <label class="mini-label">Elegí amigos</label>
+        <div id="groupMemberPicker" class="group-member-picker"></div>
+      </div>
+      <button class="btn-primary full" id="createGroupConfirmBtn">Crear grupo</button>
     </div>
   </div>
 </div>
@@ -226,7 +245,10 @@
       <button class="chat-tab active" data-ctab="chat">Chat</button>
       <button class="chat-tab" data-ctab="predicciones">Predicciones</button>
     </div>
-    <button class="chat-panel-close" id="chatPanelClose">✕</button>
+    <div class="chat-panel-header-actions">
+      <button class="chat-panel-expand" id="chatPanelExpand" title="Agrandar">⤢</button>
+      <button class="chat-panel-close" id="chatPanelClose">✕</button>
+    </div>
   </div>
 
   <div class="chat-tab-content" id="ctabChat">
@@ -241,13 +263,27 @@
           <button class="btn-mini-clear-solid" id="addFriendBtn">＋</button>
         </div>
         <div id="friendRequests"></div>
+
+        <button class="channel-item global-item" id="btnGlobalChat">
+          <span class="channel-ico">🌍</span> Chat Global
+        </button>
+
+        <div class="chat-friends-section-header">
+          <div class="mini-label">GRUPOS</div>
+          <button class="btn-mini-clear-solid small" id="createGroupBtn" title="Crear grupo">＋</button>
+        </div>
+        <div id="groupList" class="friend-list"></div>
+
         <div class="mini-label" style="margin-top:12px;">AMIGOS</div>
         <div id="friendList" class="friend-list"></div>
       </aside>
       <section class="chat-main">
         <div class="chat-empty" id="chatEmpty">Elegí un amigo para chatear.</div>
         <div class="chat-active" id="chatActive" style="display:none;">
-          <div class="chat-active-header" id="chatActiveHeader"></div>
+          <div class="chat-active-header" id="chatActiveHeader">
+            <span class="cah-avatar" id="chatActiveAvatar"></span>
+            <span class="cah-name" id="chatActiveName"></span>
+          </div>
           <div class="chat-messages" id="chatMessages"></div>
           <div class="gif-panel" id="gifPanel">
             <div class="gif-panel-search">
@@ -256,8 +292,14 @@
             </div>
             <div class="gif-panel-grid" id="gifPanelGrid"></div>
           </div>
+          <div class="emoji-panel" id="emojiPanel">
+            <div class="emoji-panel-grid" id="emojiPanelGrid"></div>
+          </div>
           <div class="chat-input-row">
+            <button class="btn-ghost icon-btn" id="chatEmojiBtn" title="Emojis">😊</button>
             <button class="btn-ghost icon-btn" id="chatGifBtn" title="Enviar GIF">GIF</button>
+            <button class="btn-ghost icon-btn" id="chatImgBtn" title="Enviar imagen">🖼</button>
+            <input type="file" id="chatImgFile" accept="image/*" style="display:none;">
             <input type="text" id="chatInput" maxlength="500" placeholder="Escribí un mensaje…">
             <button class="btn-primary" id="chatSendBtn">➤</button>
           </div>

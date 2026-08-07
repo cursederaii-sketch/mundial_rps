@@ -293,8 +293,12 @@ const MY_TAG = getMyTag();
 let MY_FRIENDS = {};
 let FRIEND_REQUESTS_IN = {};
 let FRIEND_NAMES = {};
+let FRIEND_COLORS = {};
 let MY_PREDICTIONS = {};
+let MY_GROUPS = {};
+let GROUP_INFO = {};
 let ACTIVE_CHAT_FRIEND = null;
+let ACTIVE_CHANNEL = {type:null, id:null};
 let chatMsgsRefOff = null;
 
 function getMsgCount(){ return Number(localStorage.getItem('mundial2042_msgcount')||0); }
@@ -361,6 +365,13 @@ function ensureMySocialProfile(){
   });
 }
 
+function initialOf(name){ return (name||'?').trim().charAt(0).toUpperCase() || '?'; }
+function avatarCircle(name, color, size){
+  size = size || 26;
+  const c = color || '#8b6bff';
+  return `<span class="fi-avatar" style="width:${size}px;height:${size}px;background:linear-gradient(135deg, ${c}, #1a1400)">${escapeHtml(initialOf(name))}</span>`;
+}
+
 function openFriendProfile(tag){
   if(!tag || typeof db==='undefined') return;
   db.ref('social/users/'+tag).once('value').then(snap=>{
@@ -374,6 +385,9 @@ function openFriendProfile(tag){
     const heroColor = v.color || '#8b6bff';
     document.getElementById('friendProfileHero').style.background = `linear-gradient(135deg, ${heroColor}, #1a1400)`;
     document.getElementById('friendProfileAvatar').style.background = `linear-gradient(135deg, ${heroColor}, #1a1400)`;
+    const fpInitial = document.getElementById('fpAvatarInitial');
+    if(fpInitial) fpInitial.textContent = initialOf(v.name || tag);
+    FRIEND_COLORS[tag] = heroColor;
     document.getElementById('friendProfileModal').classList.add('open');
   }).catch(()=>{});
 }
@@ -413,17 +427,26 @@ function renderFriendList(){
     list.innerHTML = '<div class="empty-note" style="padding:8px 4px;">Sin amigos todavía.</div>';
     return;
   }
+  const isActive = t => ACTIVE_CHANNEL.type==='friend' && ACTIVE_CHANNEL.id===t;
   list.innerHTML = tags.map(t=>`
-    <button class="friend-item ${ACTIVE_CHAT_FRIEND===t?'active':''}" data-tag="${t}">
-      <span class="friend-dot"></span>${escapeHtml(FRIEND_NAMES[t]||t)}
+    <button class="friend-item ${isActive(t)?'active':''}" data-tag="${t}">
+      ${avatarCircle(FRIEND_NAMES[t]||t, FRIEND_COLORS[t])}
+      <span class="friend-item-name">${escapeHtml(FRIEND_NAMES[t]||t)}</span>
+      <span class="friend-item-info" data-info="${t}" title="Ver perfil">ⓘ</span>
     </button>
   `).join('');
-  list.querySelectorAll('.friend-item').forEach(btn=> btn.addEventListener('click', ()=> openChat(btn.dataset.tag)));
+  list.querySelectorAll('.friend-item').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      if(e.target.classList.contains('friend-item-info')){ openFriendProfile(btn.dataset.tag); return; }
+      openChat(btn.dataset.tag);
+    });
+  });
   tags.forEach(t=>{
     if(!FRIEND_NAMES[t] && typeof db!=='undefined'){
       db.ref('social/users/'+t).once('value').then(snap=>{
         const v = snap.val();
         FRIEND_NAMES[t] = (v && v.name) || t;
+        FRIEND_COLORS[t] = (v && v.color) || '#8b6bff';
         renderFriendList();
       }).catch(()=>{});
     }
@@ -452,21 +475,23 @@ function declineFriendRequest(fromTag){
   db.ref(`social/requests/${MY_TAG}/${fromTag}`).remove();
 }
 
-/* ---------------- Chat privado ---------------- */
-function openChat(tag){
-  ACTIVE_CHAT_FRIEND = tag;
-  renderFriendList();
-  document.getElementById('chatEmpty').style.display = 'none';
-  document.getElementById('chatActive').style.display = 'flex';
-  const chatHeaderEl = document.getElementById('chatActiveHeader');
-  chatHeaderEl.textContent = FRIEND_NAMES[tag] || tag;
-  chatHeaderEl.style.cursor = 'pointer';
-  chatHeaderEl.title = 'Ver perfil';
-  chatHeaderEl.onclick = ()=> openFriendProfile(tag);
+/* ---------------- Chat (amigos / global / grupos) ---------------- */
+function setChatHeader(name, color, clickable){
+  const avatarEl = document.getElementById('chatActiveAvatar');
+  const nameEl = document.getElementById('chatActiveName');
+  const headerEl = document.getElementById('chatActiveHeader');
+  if(avatarEl) avatarEl.innerHTML = avatarCircle(name, color, 30);
+  if(nameEl) nameEl.textContent = name;
+  if(headerEl){
+    headerEl.style.cursor = clickable ? 'pointer' : 'default';
+    headerEl.title = clickable ? 'Ver perfil' : '';
+  }
+}
+
+function attachMessagesListener(refPath){
   if(chatMsgsRefOff){ chatMsgsRefOff(); chatMsgsRefOff = null; }
   if(typeof db==='undefined') return;
-  const chatId = [MY_TAG, tag].sort().join('__');
-  const ref = db.ref('social/chats/'+chatId+'/messages').limitToLast(200);
+  const ref = db.ref(refPath).limitToLast(200);
   const handler = (snap)=>{
     const val = snap.val() || {};
     const msgs = Object.values(val).sort((a,b)=> a.ts-b.ts);
@@ -475,10 +500,11 @@ function openChat(tag){
     box.innerHTML = msgs.map(m=>{
       const time = new Date(m.ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
       const mine = m.from===MY_TAG?'mine':'theirs';
-      if(m.type==='gif'){
-        return `<div class="chat-msg ${mine} gif-msg"><img src="${m.text}" alt="gif" loading="lazy"><span class="chat-msg-time">${time}</span></div>`;
+      const senderLabel = (ACTIVE_CHANNEL.type!=='friend' && m.from!==MY_TAG) ? `<span class="chat-msg-sender">${escapeHtml(FRIEND_NAMES[m.from]||m.from)}</span>` : '';
+      if(m.type==='gif' || m.type==='image'){
+        return `<div class="chat-msg ${mine} gif-msg">${senderLabel}<img src="${m.text}" alt="${m.type}" loading="lazy"><span class="chat-msg-time">${time}</span></div>`;
       }
-      return `<div class="chat-msg ${mine}">${escapeHtml(m.text)}<span class="chat-msg-time">${time}</span></div>`;
+      return `<div class="chat-msg ${mine}">${senderLabel}${escapeHtml(m.text)}<span class="chat-msg-time">${time}</span></div>`;
     }).join('');
     box.scrollTop = box.scrollHeight;
   };
@@ -486,20 +512,134 @@ function openChat(tag){
   chatMsgsRefOff = ()=> ref.off('value', handler);
 }
 
+function showActiveChatUI(){
+  document.getElementById('chatEmpty').style.display = 'none';
+  document.getElementById('chatActive').style.display = 'flex';
+}
+
+function openChat(tag){
+  ACTIVE_CHAT_FRIEND = tag;
+  ACTIVE_CHANNEL = {type:'friend', id:tag};
+  renderFriendList();
+  renderGroupList();
+  showActiveChatUI();
+  setChatHeader(FRIEND_NAMES[tag] || tag, FRIEND_COLORS[tag], true);
+  document.getElementById('chatActiveHeader').onclick = ()=> openFriendProfile(tag);
+  const chatId = [MY_TAG, tag].sort().join('__');
+  attachMessagesListener('social/chats/'+chatId+'/messages');
+}
+
+function openGlobalChat(){
+  ACTIVE_CHANNEL = {type:'global', id:'global'};
+  renderFriendList();
+  renderGroupList();
+  showActiveChatUI();
+  setChatHeader('Chat Global 🌍', '#2ec4b6', false);
+  document.getElementById('chatActiveHeader').onclick = null;
+  attachMessagesListener('social/global/messages');
+}
+
+function openGroupChat(groupId){
+  ACTIVE_CHANNEL = {type:'group', id:groupId};
+  renderFriendList();
+  renderGroupList();
+  showActiveChatUI();
+  const g = GROUP_INFO[groupId];
+  setChatHeader((g && g.name) || 'Grupo', '#7c5cff', false);
+  document.getElementById('chatActiveHeader').onclick = null;
+  attachMessagesListener('social/groupChats/'+groupId+'/messages');
+}
+
+function currentSendRef(){
+  if(ACTIVE_CHANNEL.type==='friend'){
+    const chatId = [MY_TAG, ACTIVE_CHANNEL.id].sort().join('__');
+    return 'social/chats/'+chatId+'/messages';
+  }
+  if(ACTIVE_CHANNEL.type==='global') return 'social/global/messages';
+  if(ACTIVE_CHANNEL.type==='group') return 'social/groupChats/'+ACTIVE_CHANNEL.id+'/messages';
+  return null;
+}
+
 function sendChatMessage(){
-  if(!ACTIVE_CHAT_FRIEND || typeof db==='undefined') return;
+  const refPath = currentSendRef();
+  if(!refPath || typeof db==='undefined') return;
   const input = document.getElementById('chatInput');
   const text = input.value.trim().slice(0,500);
   if(!text) return;
-  const chatId = [MY_TAG, ACTIVE_CHAT_FRIEND].sort().join('__');
-  db.ref('social/chats/'+chatId+'/messages').push({from: MY_TAG, text, ts: Date.now()});
+  db.ref(refPath).push({from: MY_TAG, text, ts: Date.now()});
   bumpMsgCount();
   input.value = '';
+}
+
+/* ---------------- Grupos ---------------- */
+function renderGroupList(){
+  const list = document.getElementById('groupList');
+  if(!list) return;
+  const ids = Object.keys(MY_GROUPS||{});
+  if(ids.length===0){
+    list.innerHTML = '<div class="empty-note" style="padding:6px 4px;">Sin grupos todavía.</div>';
+    return;
+  }
+  const isActive = id => ACTIVE_CHANNEL.type==='group' && ACTIVE_CHANNEL.id===id;
+  list.innerHTML = ids.map(id=>{
+    const g = GROUP_INFO[id];
+    const name = (g && g.name) || 'Grupo';
+    return `<button class="friend-item ${isActive(id)?'active':''}" data-gid="${id}">
+      <span class="fi-avatar" style="width:26px;height:26px;background:linear-gradient(135deg,#7c5cff,#1a1400)">👥</span>
+      <span class="friend-item-name">${escapeHtml(name)}</span>
+    </button>`;
+  }).join('');
+  list.querySelectorAll('.friend-item[data-gid]').forEach(btn=> btn.addEventListener('click', ()=> openGroupChat(btn.dataset.gid)));
+  ids.forEach(id=>{
+    if(!GROUP_INFO[id] && typeof db!=='undefined'){
+      db.ref('social/groups/'+id).once('value').then(snap=>{
+        GROUP_INFO[id] = snap.val() || {};
+        renderGroupList();
+      }).catch(()=>{});
+    }
+  });
+}
+
+function openGroupModal(){
+  const picker = document.getElementById('groupMemberPicker');
+  const tags = Object.keys(MY_FRIENDS||{});
+  if(tags.length===0){
+    picker.innerHTML = '<div class="empty-note" style="padding:6px 0;">Agregá amigos primero para poder sumarlos a un grupo.</div>';
+  }else{
+    picker.innerHTML = tags.map(t=>`
+      <label class="group-member-row">
+        <input type="checkbox" value="${t}">
+        ${avatarCircle(FRIEND_NAMES[t]||t, FRIEND_COLORS[t], 22)}
+        <span>${escapeHtml(FRIEND_NAMES[t]||t)}</span>
+      </label>
+    `).join('');
+  }
+  document.getElementById('groupNameInput').value = '';
+  document.getElementById('groupModal').classList.add('open');
+}
+
+function createGroup(){
+  const name = document.getElementById('groupNameInput').value.trim().slice(0,30);
+  if(!name){ alert('Ponele un nombre al grupo.'); return; }
+  if(typeof db==='undefined'){ alert('Sin conexión.'); return; }
+  const checked = Array.from(document.querySelectorAll('#groupMemberPicker input[type=checkbox]:checked')).map(c=>c.value);
+  const members = {[MY_TAG]: true};
+  checked.forEach(t=> members[t] = true);
+  const newRef = db.ref('social/groups').push();
+  const groupId = newRef.key;
+  newRef.set({name, owner: MY_TAG, members, ts: Date.now()}).then(()=>{
+    Object.keys(members).forEach(t=>{
+      db.ref('social/userGroups/'+t+'/'+groupId).set(true);
+    });
+    document.getElementById('groupModal').classList.remove('open');
+    openGroupChat(groupId);
+  }).catch(()=> alert('No se pudo crear el grupo.'));
 }
 
 /* ---------------- GIFs (GIPHY) ---------------- */
 let gifSearchTimer = null;
 function toggleGifPanel(){
+  closeEmojiPanel();
   const panel = document.getElementById('gifPanel');
   const opening = !panel.classList.contains('open');
   panel.classList.toggle('open', opening);
@@ -528,16 +668,53 @@ function loadGifs(query){
       return `<img src="${preview}" data-full="${full}" loading="lazy">`;
     }).join('');
     grid.querySelectorAll('img').forEach(img=>{
-      img.addEventListener('click', ()=> sendGif(img.dataset.full));
+      img.addEventListener('click', ()=> sendMedia(img.dataset.full, 'gif'));
     });
   }).catch(()=>{ grid.innerHTML = '<div class="gif-panel-empty">Error al buscar GIFs.</div>'; });
 }
-function sendGif(url){
-  if(!ACTIVE_CHAT_FRIEND || typeof db==='undefined') return;
-  const chatId = [MY_TAG, ACTIVE_CHAT_FRIEND].sort().join('__');
-  db.ref('social/chats/'+chatId+'/messages').push({from: MY_TAG, text: url, type:'gif', ts: Date.now()});
+function sendMedia(url, type){
+  const refPath = currentSendRef();
+  if(!refPath || typeof db==='undefined') return;
+  db.ref(refPath).push({from: MY_TAG, text: url, type, ts: Date.now()});
   bumpMsgCount();
   document.getElementById('gifPanel').classList.remove('open');
+}
+
+/* ---------------- Imágenes en el chat ---------------- */
+const MAX_CHAT_IMG_MB = 1.5;
+function sendChatImage(file){
+  if(!file) return;
+  if(!currentSendRef()){ alert('Elegí un chat primero.'); return; }
+  if(!file.type.startsWith('image/')){ alert('Elegí un archivo de imagen.'); return; }
+  if(file.size > MAX_CHAT_IMG_MB * 1024 * 1024){
+    alert(`La imagen pesa más de ${MAX_CHAT_IMG_MB}MB. Elegí una más liviana.`);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e)=> sendMedia(e.target.result, 'image');
+  reader.onerror = ()=> alert('No se pudo leer la imagen.');
+  reader.readAsDataURL(file);
+}
+
+/* ---------------- Emojis ---------------- */
+const EMOJI_LIST = ['😀','😂','😍','😎','🤩','😢','😡','🤔','👍','👎','🙌','👏','🔥','⚽','🏆','🎉','❄','💬','😱','🥶','🤝','💪','🙏','😴','😅','🥳','😤','👀','⭐','💯'];
+function renderEmojiPanel(){
+  const grid = document.getElementById('emojiPanelGrid');
+  if(!grid) return;
+  grid.innerHTML = EMOJI_LIST.map(e=>`<button class="emoji-btn" type="button">${e}</button>`).join('');
+  grid.querySelectorAll('.emoji-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const input = document.getElementById('chatInput');
+      input.value = (input.value + btn.textContent).slice(0,500);
+      input.focus();
+    });
+  });
+}
+function closeEmojiPanel(){ document.getElementById('emojiPanel').classList.remove('open'); }
+function toggleEmojiPanel(){
+  document.getElementById('gifPanel').classList.remove('open');
+  const panel = document.getElementById('emojiPanel');
+  panel.classList.toggle('open');
 }
 document.getElementById('chatGifBtn').addEventListener('click', toggleGifPanel);
 document.getElementById('gifCloseBtn').addEventListener('click', ()=> document.getElementById('gifPanel').classList.remove('open'));
@@ -546,6 +723,17 @@ document.getElementById('gifSearchInput').addEventListener('input', (e)=>{
   const q = e.target.value.trim();
   gifSearchTimer = setTimeout(()=> loadGifs(q || 'futbol'), 400);
 });
+document.getElementById('chatEmojiBtn').addEventListener('click', toggleEmojiPanel);
+document.getElementById('chatImgBtn').addEventListener('click', ()=> document.getElementById('chatImgFile').click());
+document.getElementById('chatImgFile').addEventListener('change', (e)=>{
+  sendChatImage(e.target.files[0]);
+  e.target.value = '';
+});
+document.getElementById('btnGlobalChat').addEventListener('click', openGlobalChat);
+document.getElementById('createGroupBtn').addEventListener('click', openGroupModal);
+document.getElementById('closeGroupModal').addEventListener('click', ()=> document.getElementById('groupModal').classList.remove('open'));
+document.getElementById('groupModal').addEventListener('click', (e)=>{ if(e.target.id==='groupModal') document.getElementById('groupModal').classList.remove('open'); });
+document.getElementById('createGroupConfirmBtn').addEventListener('click', createGroup);
 
 /* ---------------- Predicciones ---------------- */
 function savePrediction(matchId, hs, as){
@@ -607,6 +795,7 @@ function renderPredictions(){
 function initSocial(){
   if(typeof firebase==='undefined' || typeof db==='undefined') return;
   ensureMySocialProfile();
+  renderEmojiPanel();
   db.ref('social/friends/'+MY_TAG).on('value', snap=>{
     MY_FRIENDS = snap.val() || {};
     renderFriendList();
@@ -624,6 +813,10 @@ function initSocial(){
     if(activeTab && activeTab.dataset.ctab==='predicciones') renderPredictions();
     renderAchievements();
   });
+  db.ref('social/userGroups/'+MY_TAG).on('value', snap=>{
+    MY_GROUPS = snap.val() || {};
+    renderGroupList();
+  });
 }
 
 document.getElementById('chatFab').addEventListener('click', ()=>{
@@ -633,9 +826,13 @@ document.getElementById('chatFab').addEventListener('click', ()=>{
     document.getElementById('myTagValue').textContent = MY_TAG;
     renderFriendList();
     renderFriendRequests();
+    renderGroupList();
   }
 });
 document.getElementById('chatPanelClose').addEventListener('click', ()=> document.getElementById('chatPanel').classList.remove('open'));
+document.getElementById('chatPanelExpand').addEventListener('click', ()=>{
+  document.getElementById('chatPanel').classList.toggle('expanded');
+});
 
 document.querySelectorAll('.chat-tab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
