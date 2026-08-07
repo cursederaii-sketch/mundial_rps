@@ -210,6 +210,23 @@ function setLiveStatus(on, label){
   text.textContent = label || (on ? 'EN VIVO' : 'Sin conexión');
 }
 
+/* Belt-and-suspenders: force every score field back to a real `null`
+   (never `undefined`) right after merging data that came from Firebase,
+   since that's exactly the shape that got lost on the way there. */
+function normalizeScores(state){
+  (state.matches||[]).forEach(m=>{
+    if(!hasScore(m.hs)) m.hs = null;
+    if(!hasScore(m.as)) m.as = null;
+  });
+  const K = state.knockout;
+  if(K){
+    [...(K.r16||[]), ...(K.qf||[]), ...(K.sf||[]), K.final, K.bronze].filter(Boolean).forEach(m=>{
+      if(!hasScore(m.hs)) m.hs = null;
+      if(!hasScore(m.as)) m.as = null;
+    });
+  }
+}
+
 function initFirebaseSync(){
   if(typeof firebase === 'undefined' || typeof db === 'undefined'){
     setLiveStatus(false, 'Sin conexión');
@@ -231,6 +248,7 @@ function initFirebaseSync(){
     applyingRemote = true;
     if(remote.matches) STATE.matches = remote.matches;
     if(remote.knockout) STATE.knockout = remote.knockout;
+    normalizeScores(STATE);
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
     render();
     applyingRemote = false;
@@ -261,6 +279,14 @@ function teamLabel(code){ const t=teamByCode(code); return t ? `<span class="inl
 function teamFlag(code){ return flagImg(code,'w40'); }
 function teamName(code){ const t=teamByCode(code); return t ? t.name : '???'; }
 
+/* A score field counts as "present" only if it's a real value. Firebase
+   Realtime Database silently DROPS any field whose value is `null` when
+   it's written, so an unplayed match's hs/as (null locally) comes back
+   from the server as `undefined`, not `null`. Every check in this file
+   must treat both the same way — hence this single shared helper instead
+   of scattered `=== null` comparisons. */
+function hasScore(v){ return v!==null && v!==undefined && v!==''; }
+
 /* ---------------- Standings ---------------- */
 function computeStandings(group){
   const teams = TEAM_DATA.filter(t=>t.group===group);
@@ -268,7 +294,7 @@ function computeStandings(group){
   teams.forEach(t=> table[t.code] = {code:t.code, pj:0,pg:0,pe:0,pp:0,gf:0,gc:0,pts:0});
 
   STATE.matches.filter(m=>m.group===group).forEach(m=>{
-    if(m.hs===null || m.as===null || m.hs==='' || m.as==='') return;
+    if(!isPlayed(m)) return;
     const hs = Number(m.hs), as = Number(m.as);
     const H = table[m.home], A = table[m.away];
     H.pj++; A.pj++; H.gf+=hs; H.gc+=as; A.gf+=as; A.gc+=hs;
@@ -286,10 +312,11 @@ function computeStandings(group){
 }
 
 function groupComplete(group){
-  return STATE.matches.filter(m=>m.group===group).every(m=> m.hs!==null && m.as!==null && m.hs!=='' && m.as!=='');
+  return STATE.matches.filter(m=>m.group===group).every(isPlayed);
 }
 function allGroupsComplete(){ return GROUP_LETTERS.every(groupComplete); }
-function playedCount(){ return STATE.matches.filter(m=>m.hs!==null && m.as!==null && m.hs!=='' && m.as!=='').length; }
+function playedCount(){ return STATE.matches.filter(isPlayed).length; }
+function isPlayed(m){ return hasScore(m.hs) && hasScore(m.as) && Number.isFinite(Number(m.hs)) && Number.isFinite(Number(m.as)); }
 
 /* ---------------- Router / Render ---------------- */
 const content = document.getElementById('content');
@@ -430,7 +457,7 @@ function bTeamRow(m, side){
   const name = side==='home' ? m.homeName : m.awayName;
   const score = side==='home' ? m.hs : m.as;
   const otherScore = side==='home' ? m.as : m.hs;
-  const isWinner = (score!==null && otherScore!==null && score!=='' && otherScore!=='' && Number(score)>Number(otherScore));
+  const isWinner = (hasScore(score) && hasScore(otherScore) && Number(score)>Number(otherScore));
   const label = name ? teamLabel(name) : '???';
   const editable = STATE.admin.unlocked && name;
   return `<div class="bteam ${isWinner?'winner':''}">
@@ -449,7 +476,7 @@ function renderCuadro(){
       ${items.map(m=>`<div class="bmatch">${bTeamRow(m,'home')}${bTeamRow(m,'away')}</div>`).join('')}
     </div>`;
 
-  const champion = (K.final.hs!==null && K.final.as!==null && K.final.hs!=='' && K.final.as!=='')
+  const champion = isPlayed(K.final)
     ? (Number(K.final.hs)>Number(K.final.as) ? K.final.homeName : (Number(K.final.as)>Number(K.final.hs) ? K.final.awayName : null))
     : null;
 
@@ -525,14 +552,14 @@ function findKnockoutMatch(id){
 }
 
 function matchWinner(m){
-  if(m.hs===null||m.as===null||m.hs===''||m.as==='') return null;
+  if(!isPlayed(m)) return null;
   const hs=Number(m.hs), as=Number(m.as);
   if(hs>as) return m.homeName;
   if(as>hs) return m.awayName;
   return null;
 }
 function matchLoser(m){
-  if(m.hs===null||m.as===null||m.hs===''||m.as==='') return null;
+  if(!isPlayed(m)) return null;
   const hs=Number(m.hs), as=Number(m.as);
   if(hs>as) return m.awayName;
   if(as>hs) return m.homeName;
@@ -706,8 +733,8 @@ function liveGroupFor(championName){
 function codeMatchToTuple(m){
   const hn = m.homeName ? teamName(m.homeName) : '???';
   const an = m.awayName ? teamName(m.awayName) : '???';
-  const hs = (m.hs!==null && m.hs!=='') ? Number(m.hs) : null;
-  const as = (m.as!==null && m.as!=='') ? Number(m.as) : null;
+  const hs = hasScore(m.hs) ? Number(m.hs) : null;
+  const as = hasScore(m.as) ? Number(m.as) : null;
   return [hn, hs, an, as];
 }
 function liveBracketData(){
@@ -724,14 +751,14 @@ function liveBracketData(){
 function currentChampionEntry(){
   const K = STATE.knockout;
   const f = K.final;
-  if(f.hs===null||f.as===null||f.hs===''||f.as==='' || !f.homeName || !f.awayName) return null;
+  if(!isPlayed(f) || !f.homeName || !f.awayName) return null;
   const hs=Number(f.hs), as=Number(f.as);
   if(hs===as) return null;
   const champCode = hs>as ? f.homeName : f.awayName;
   const runnerCode = hs>as ? f.awayName : f.homeName;
   let third=null, fourth=null, thirdScore=null;
   const br = K.bronze;
-  if(br.hs!==null && br.as!==null && br.hs!=='' && br.as!=='' && br.homeName && br.awayName){
+  if(isPlayed(br) && br.homeName && br.awayName){
     const bhs=Number(br.hs), bas=Number(br.as);
     if(bhs!==bas){
       third = bhs>bas ? teamName(br.homeName) : teamName(br.awayName);
@@ -1025,11 +1052,11 @@ function renderMiniGroup(group, year){
 function miniMatch(match){
   if(!match) return `<div class="mm"><div class="mm-team">???</div><div class="mm-team">???</div></div>`;
   const [hn,hs,an,as,pen] = match;
-  const decided = hs!==null && as!==null && hs!=='' && as!=='';
+  const decided = hasScore(hs) && hasScore(as);
   const hWin = pen ? pen==='home' : (decided && hs>as);
   const aWin = pen ? pen==='away' : (decided && as>hs);
-  const hDisp = (hs===null||hs==='') ? '–' : hs;
-  const aDisp = (as===null||as==='') ? '–' : as;
+  const hDisp = hasScore(hs) ? hs : '–';
+  const aDisp = hasScore(as) ? as : '–';
   return `<div class="mm">
     <div class="mm-team ${hWin?'win':''}"><span class="flag">${flagByCountryName(hn,'w40')}</span>${hn}<b>${hDisp}${pen==='home'?'*':''}</b></div>
     <div class="mm-team ${aWin?'win':''}"><span class="flag">${flagByCountryName(an,'w40')}</span>${an}<b>${aDisp}${pen==='away'?'*':''}</b></div>
@@ -1038,7 +1065,7 @@ function miniMatch(match){
 
 function renderMiniBracket(bracket){
   const f = bracket.final;
-  const finalDecided = f && f[1]!==null && f[3]!==null && f[1]!=='' && f[3]!=='';
+  const finalDecided = f && hasScore(f[1]) && hasScore(f[3]);
   const champName = finalDecided ? (f[1]>f[3]?f[0]:f[2]) : null;
   return `
   <div class="mini-bracket">
