@@ -1,243 +1,79 @@
-# MUNDIAL 2042 · Hielo Eterno
+# Mundial 2042 · Hielo Eterno
 
-> 🏆 Aplicación web interactiva para gestionar un torneo de fútbol futurista en la era glacial.
+App de torneo (grupos + cuadro de eliminación + Salón de la Fama) en HTML/CSS/JS puro.
+No necesita backend ni build: subís los archivos a cualquier hosting estático (GitHub Pages,
+Netlify, Vercel) y funciona.
 
-![Version](https://img.shields.io/badge/version-2.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-production-brightgreen)
+## Archivos
 
-## 📖 Descripción
+- `index.html` — estructura de la página
+- `style.css` — todo el estilo (tema "Aurora Polar")
+- `app.js` — datos, lógica del torneo y del Salón de la Fama
+- `assets/` — **acá van tus fotos** (opcional, ver abajo)
 
-**MUNDIAL 2042** es una aplicación web moderna, elegante y funcional diseñada para gestionar un torneo de fútbol internacional. Con una interfaz inspirada en la Aurora Boreal, permite:
+## Cómo subirlo a GitHub Pages
 
-- 📊 Registrar resultados de partidos
-- 🏅 Generar tablas de posiciones automáticamente
-- 👤 Personalizar tu perfil como Director Técnico
-- 🎨 Personalizar temas y colores
-- 📱 Modo responsive (desktop y mobile)
-- 💾 Almacenamiento local persistente
-- 📥 Exportar/importar datos
+1. Creá un repositorio público en GitHub.
+2. Subí **todo el contenido de esta carpeta** (`index.html`, `style.css`, `app.js` y la carpeta
+   `assets/`) a la raíz del repo — no subas el .zip, subí los archivos sueltos.
+3. Settings → Pages → Branch: `main`, carpeta `/root` → Save.
+4. Esperá un par de minutos, el link va a ser `https://tu-usuario.github.io/tu-repo/`.
 
-## 🚀 Características v2.0
+## Fotos reales (opcional)
 
-### ✨ Mejoras Implementadas
+La app funciona perfecto sin ninguna foto — usa un trofeo dibujado en SVG y las banderas de
+[flagcdn.com](https://flagcdn.com) como respaldo. Si querés reemplazar eso por fotos reales
+(la copa, estadios, selecciones festejando), subí archivos con **estos nombres exactos** dentro
+de la carpeta `assets/` de tu repositorio. La app los detecta solos, no hay que tocar código.
 
-- **Mejor estructura de código** - Organización clara y comentarios
-- **Toast notifications** - Sistema de notificaciones mejorado
-- **Mejor manejo de errores** - Validaciones robustas
-- **Optimizaciones de rendimiento** - Animaciones suaves, menos rerenders
-- **Accesibilidad mejorada** - ARIA labels, roles semánticos
-- **Almacenamiento optimizado** - Mejor gestión de localStorage
-- **Interfaz refinada** - UX/UI pulida
+### `assets/mundiales/`
 
-## 🛠️ Instalación
+| Archivo | Dónde se usa |
+|---|---|
+| `trophy.png` | Ícono junto al título "Salón de la Fama" (arriba de todo) |
+| `2022.jpg` | Fondo de la fila "2022" en Todos los Mundiales / detalle del mundial |
+| `2026.jpg` | ídem para 2026 |
+| `2030.jpg` | ídem para 2030 |
+| `2034.jpg` | ídem para 2034 |
+| `2038.jpg` | ídem para 2038 |
+| `2042.jpg` | ídem para 2042 (mundial en curso) |
 
-### Opción 1: Clonar del repositorio
+### `assets/countries/`
 
-```bash
-git clone https://github.com/tu-usuario/mundial2042.git
-cd mundial2042
+Formato: `{codigo-iso}.jpg` (tarjeta chica) y `{codigo-iso}-hero.jpg` (banner grande del perfil
+del país). Los códigos son de 2 letras, iguales a los que usa flagcdn.com. Los que hoy tienen
+títulos son:
+
+| País | Código | Archivos |
+|---|---|---|
+| España | `es` | `assets/countries/es.jpg`, `assets/countries/es-hero.jpg` |
+| Argentina | `ar` | `assets/countries/ar.jpg`, `assets/countries/ar-hero.jpg` |
+| Alemania | `de` | `assets/countries/de.jpg`, `assets/countries/de-hero.jpg` |
+| Colombia | `co` | `assets/countries/co.jpg`, `assets/countries/co-hero.jpg` |
+
+Si algún otro país sale campeón en el futuro (mundial 2042 en curso, o cualquier otro que agregues
+a `HISTORY` en `app.js`), usá su código ISO de 2 letras. Los 32 equipos del torneo actual y sus
+códigos están al principio de `app.js`, en el objeto `ISO_MAP`.
+
+### Recomendaciones de tamaño
+
+- `trophy.png`: imagen cuadrada, fondo transparente, ~200×200px.
+- `*.jpg` de países y mundiales: horizontal, ~800×500px, menos de 300KB cada una para que la
+  página cargue rápido.
+
+### Importante: derechos de las fotos
+
+Usá fotos que tengas derecho a usar (propias, de bancos de imágenes libres, o con licencia
+adecuada). La copa del mundo real, escudos oficiales y fotos de jugadores suelen tener derechos
+de autor — si vas a compartir este sitio públicamente, lo más seguro es usar imágenes genéricas
+de estadios/celebraciones o ilustraciones propias en vez de fotos oficiales de FIFA.
+
+## Clave de administrador
+
+Para cargar resultados necesitás desbloquear el modo edición en **Admin** con la clave:
+
+```
+AURORA2042
 ```
 
-### Opción 2: Descarga manual
-
-Descarga los archivos:
-- `index.html`
-- `style.css`
-- `app.js`
-
-Colócalos en la misma carpeta.
-
-### Opción 3: GitHub Pages (Recomendado)
-
-1. Crea un repositorio en GitHub
-2. Sube los archivos HTML, CSS, JS
-3. En Settings → Pages, selecciona `main` como rama
-4. Tu app estará disponible en: `https://tu-usuario.github.io/mundial2042`
-
-## 💻 Uso
-
-### Abrir la aplicación
-
-Abre `index.html` en tu navegador o accede a la URL de GitHub Pages.
-
-### Navegar
-
-- **Inicio**: Resumen del torneo
-- **Fase Grupos**: Ingresa resultados de partidos
-- **Cuadro Eliminación**: Próximamente
-- **Salón Fama**: Histórico de ediciones pasadas
-- **Ajustes**: Personaliza colores y tema
-- **Admin**: Panel administrativo (contraseña requerida)
-
-### Ingreso de Resultados
-
-1. Ve a "Fase Grupos"
-2. Selecciona el grupo (A-H)
-3. Ingresa los goles en cada partido
-4. Los cambios se guardan automáticamente
-5. Las tablas se actualizan en tiempo real
-
-### Panel Admin
-
-**Contraseña**: `AURORA2042`
-
-Funcionalidades:
-- 📥 Exportar datos a JSON
-- 🔄 Reiniciar torneo completo
-- 🔍 Ver estado de la BD
-- 🔒 Cerrar sesión
-
-## 🎨 Personalización
-
-### Cambiar Colores
-
-1. Ve a "Ajustes"
-2. Modifica "Gradiente 1" y "Gradiente 2"
-3. Haz clic en "Guardar Tema"
-
-### Personalizar Perfil
-
-1. Haz clic en el avatar (arriba a la derecha)
-2. Edita:
-   - Nombre y color
-   - Avatar (GIF/PNG/JPG)
-   - Banner
-   - Descripción
-   - Pronombres
-   - Equipo que sigues
-3. Guarda cambios
-
-### Temas Presets
-
-```css
-/* Tema Default (Aurora) */
---grad1: #7c5cff
---grad2: #0a1931
-
-/* Tema Oceáno */
---grad1: #00d4ff
---grad2: #0a1931
-
-/* Tema Fuego */
---grad1: #ff6b35
---grad2: #004e89
-```
-
-## 📊 Estructura de Datos
-
-### Estado Local
-
-Se almacena en `localStorage` bajo la clave `mundial2042_state_v1`:
-
-```json
-{
-  "profile": {
-    "name": "DT IPFT",
-    "color": "#f2c230",
-    "desc": "Estratega polar",
-    "pronouns": "él/he",
-    "follows": "ARG",
-    "avatar": null,
-    "banner": null
-  },
-  "settings": {
-    "grad1": "#7c5cff",
-    "grad2": "#0a1931",
-    "device": "desktop"
-  },
-  "admin": {
-    "unlocked": false
-  },
-  "matches": [...],
-  "knockout": {...},
-  "view": "inicio"
-}
-```
-
-## 📱 Compatibilidad
-
-- ✅ Chrome/Chromium (v90+)
-- ✅ Firefox (v88+)
-- ✅ Safari (v14+)
-- ✅ Edge (v90+)
-- ✅ Mobile (iOS Safari, Chrome Mobile)
-
-## 🔒 Seguridad
-
-- No se envían datos a servidores
-- Todo se almacena localmente en el navegador
-- Las imágenes se comprimen en base64
-- Máximo 2MB por imagen
-
-## ⚡ Optimizaciones
-
-- Zero dependencias externas (excepto Google Fonts)
-- Bundle size: ~50KB
-- Tiempo de carga: <1s
-- Animaciones GPU-accelerated
-- Media queries para responsive
-- LocalStorage para persistencia
-
-## 🐛 Troubleshooting
-
-### "No se guardan los datos"
-
-- Comprueba que localStorage no esté deshabilitado
-- Modo incógnito/privado no persiste datos entre sesiones
-- Intenta limpiar cookies/caché
-
-### "Las imágenes son muy pesadas"
-
-- Máximo 2MB recomendado
-- Usa compresión: https://tinypng.com
-- Convierte a GIF para mejor compresión
-
-### "Las banderas no se ven bien"
-
-- Es un issue conocido de emojis en Windows
-- Solución: Usar imágenes SVG en futuras versiones
-- Actualiza Windows a la versión más reciente
-
-## 📈 Roadmap
-
-- [ ] Cuadro de eliminación interactivo
-- [ ] Estadísticas avanzadas
-- [ ] Sistema de predicciones
-- [ ] Sincronización en la nube
-- [ ] App nativa (Electron)
-- [ ] Multijugador en tiempo real
-- [ ] Banderas como imágenes SVG
-
-## 💡 Tips de Uso
-
-1. **Exporta regularmente** - Haz backup de tus datos
-2. **Personaliza tu perfil** - Refleja tu estilo de DT
-3. **Usa vista mobile** - Prueba en diferentes dispositivos
-4. **Comparte el torneo** - Botón "Compartir" en la barra superior
-5. **Lee la consola** - Útil para debugging
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Para cambios significativos:
-
-1. Fork el proyecto
-2. Crea una rama (`git checkout -b feature/mejora`)
-3. Commit cambios (`git commit -am 'Agrega mejora'`)
-4. Push a la rama (`git push origin feature/mejora`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-MIT License - Ver `LICENSE` para detalles
-
-## 👨‍💻 Autor
-
-Desarrollado con ❄️ para amantes del fútbol futurista.
-
----
-
-**¿Problemas o sugerencias?** Abre un issue o contacta al desarrollador.
-
-**Última actualización**: Julio 2026  
-**Versión actual**: 2.0.0
+Podés cambiarla editando la constante `ADMIN_KEY` al principio de `app.js`.

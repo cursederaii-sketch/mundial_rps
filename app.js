@@ -32,6 +32,20 @@ function flagByName(name, size){
   return t ? flagImg(t.code, size) : '<span class="flag-fallback">🏳</span>';
 }
 
+/* Extra countries that appear in historical/fictional data but aren't part
+   of the current 32-team roster, plus a couple of common aliases. */
+const EXTRA_ISO = {
+  'Canadá':'ca', 'Suiza':'ch', 'Polonia':'pl', 'Holanda':'nl',
+  'EEUU':'us', 'Corea del Sur':'kr', 'Senegal':'sn', 'Serbia':'rs',
+};
+function isoForName(name){
+  const t = TEAM_DATA.find(x=>x.name===name);
+  if(t) return ISO_MAP[t.code];
+  if(EXTRA_ISO[name]) return EXTRA_ISO[name];
+  return null;
+}
+function flagByCountryName(name, size){ return flagImgIso(isoForName(name), size, name); }
+
 const TEAM_DATA = [
   // group A
   {code:'ALE', name:'Alemania', flag:'🇩🇪', group:'A'},
@@ -78,11 +92,29 @@ const TEAM_DATA = [
 const GROUP_LETTERS = ['A','B','C','D','E','F','G','H'];
 
 const HISTORY = [
-  {year:2022, host:'Colombia', iso:'co', final:'2-0 Francia', third:null, balon:null, goleador:null, fairplay:null, star:1},
-  {year:2026, host:'España', iso:'es', final:'2-0 Francia', third:'Holanda 3-1 Paraguay', balon:null, goleador:null, fairplay:null, star:1},
-  {year:2030, host:'Alemania', iso:'de', final:'2-1 Francia', third:'EEUU 3-2 España', balon:null, goleador:null, fairplay:null, star:1},
-  {year:2034, host:'España', iso:'es', final:'3-2 Ghana', third:'Colombia 3-2 Mexico', balon:'Julian Alvarez', goleador:'Julian Alvarez', fairplay:'Ghana', star:2},
-  {year:2038, host:'Argentina', iso:'ar', final:'3-0 Inglaterra', third:'Costa Rica 3-2 Uruguay', balon:'Nico Paz', goleador:'Nico Paz', fairplay:'Argentina', star:1},
+  {year:2022, champion:'Colombia', runnerUp:'Francia', finalScore:[2,0], third:'Croacia', fourth:'Marruecos', thirdScore:[2,1], balon:null, goleador:null, fairplay:null},
+  {year:2026, champion:'España', runnerUp:'Francia', finalScore:[2,0], third:'Holanda', fourth:'Paraguay', thirdScore:[3,1], balon:null, goleador:null, fairplay:null,
+    group:{label:'GRUPO B', teams:[
+      {name:'España', pj:3,g:2,e:1,p:0,gf:7,gc:2,pts:7},
+      {name:'Japón', pj:3,g:1,e:1,p:1,gf:4,gc:3,pts:4},
+      {name:'Costa Rica', pj:3,g:1,e:1,p:1,gf:3,gc:4,pts:4},
+      {name:'Nigeria', pj:3,g:0,e:1,p:2,gf:2,gc:7,pts:1},
+    ]}},
+  {year:2030, champion:'Alemania', runnerUp:'Francia', finalScore:[2,1], third:'Estados Unidos', fourth:'España', thirdScore:[3,2], balon:null, goleador:null, fairplay:null},
+  {year:2034, champion:'España', runnerUp:'Ghana', finalScore:[3,2], third:'Colombia', fourth:'México', thirdScore:[3,2], balon:'Julian Alvarez', goleador:'Julian Alvarez', fairplay:'Ghana'},
+  {year:2038, champion:'Argentina', runnerUp:'Alemania', finalScore:[3,1], third:null, fourth:null, thirdScore:null, balon:'Nico Paz', goleador:'Nico Paz', fairplay:'Argentina',
+    group:{label:'GRUPO F', teams:[
+      {name:'Argentina', pj:3,g:2,e:1,p:0,gf:7,gc:2,pts:7},
+      {name:'Croacia', pj:3,g:2,e:1,p:0,gf:6,gc:2,pts:7},
+      {name:'Japón', pj:3,g:1,e:0,p:2,gf:3,gc:5,pts:3},
+      {name:'Canadá', pj:3,g:0,e:0,p:3,gf:3,gc:8,pts:0},
+    ]},
+    bracket:{
+      r16:[['Países Bajos',1,'México',0], ['Argentina',3,'Croacia',1], ['Brasil',2,'Dinamarca',1], ['Francia',2,'Inglaterra',1],
+           ['España',1,'Marruecos',0], ['Portugal',3,'Japón',1], ['Alemania',2,'Canadá',0], ['Uruguay',1,'Colombia',0]],
+      qf:[['Países Bajos',0,'Argentina',2], ['Brasil',1,'Francia',3], ['España',2,'Portugal',1], ['Alemania',2,'Uruguay',1]],
+      sf:[['Argentina',2,'Francia',1], ['España',1,'Alemania',1,'away']],
+    }},
 ];
 
 function defaultState(){
@@ -194,7 +226,7 @@ function render(){
     case 'inicio': content.innerHTML = renderInicio(); break;
     case 'grupos': content.innerHTML = renderGrupos(); attachGrupoEvents(); break;
     case 'cuadro': content.innerHTML = renderCuadro(); attachCuadroEvents(); break;
-    case 'fama': content.innerHTML = renderFama(); break;
+    case 'fama': content.innerHTML = renderFama(); attachFamaEvents(); break;
     case 'ajustes': content.innerHTML = renderAjustes(); attachAjustesEvents(); break;
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
     default: content.innerHTML = renderInicio();
@@ -496,6 +528,116 @@ function generateBracketFromGroups(){
 }
 
 /* ---------------- SALÓN DE LA FAMA ---------------- */
+
+/* Deterministic PRNG so generated (fictional) brackets/groups stay stable
+   across re-renders instead of reshuffling on every click. */
+function seededRandom(seed){
+  let t = seed >>> 0;
+  return function(){
+    t |= 0; t = (t + 0x6D2B79F5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffledPool(seed, exclude){
+  const rng = seededRandom(seed);
+  const pool = TEAM_DATA.map(t=>t.name).filter(n=> !exclude.includes(n));
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  return {pool, rng};
+}
+function winScore(rng){ const w=1+Math.floor(rng()*3); const l=Math.max(0,w-1-Math.floor(rng()*2)); return [w,l]; }
+
+function generateGroupTable(year, championName){
+  const {pool} = shuffledPool(year*3+1, [championName]);
+  const fillers = pool.slice(0,3);
+  const letter = String.fromCharCode(65 + (year % 8));
+  return {label:`GRUPO ${letter}`, teams:[
+    {name:championName, pj:3,g:2,e:1,p:0,gf:7,gc:2,pts:7},
+    {name:fillers[0], pj:3,g:1,e:1,p:1,gf:4,gc:3,pts:4},
+    {name:fillers[1], pj:3,g:1,e:1,p:1,gf:3,gc:4,pts:4},
+    {name:fillers[2], pj:3,g:0,e:1,p:2,gf:2,gc:7,pts:1},
+  ]};
+}
+
+function generateBracket(year, championName, runnerUpName, finalScore, thirdName, fourthName, thirdScore){
+  const exclude = [championName, runnerUpName, thirdName, fourthName].filter(Boolean);
+  const {pool, rng} = shuffledPool(year*11+5, exclude);
+  const f = pool.slice(0,12);
+  thirdName = thirdName || f[10];
+  fourthName = fourthName || f[11];
+
+  const m = (a,b)=>{ const [w,l]=winScore(rng); return rng()<0.5 ? [a,w,b,l] : [b,l,a,w]; };
+  // force a name to win a match against a filler
+  const win = (winner, loser)=>{ const [w,l]=winScore(rng); return [winner,w,loser,l]; };
+
+  const r16 = [
+    win(championName, f[0]), m(f[1],f[2]),
+    win(thirdName, f[3]), m(f[4],f[5]),
+    win(runnerUpName, f[6]), m(f[7],f[8]),
+    win(fourthName, f[9]), m(f[10],f[11]),
+  ];
+
+  const qfA1 = win(championName, r16[1][1]>r16[1][3] ? r16[1][0] : r16[1][2]);
+  const qfA2 = win(thirdName, r16[3][1]>r16[3][3] ? r16[3][0] : r16[3][2]);
+  const qfB1 = win(runnerUpName, r16[5][1]>r16[5][3] ? r16[5][0] : r16[5][2]);
+  const qfB2 = win(fourthName, r16[7][1]>r16[7][3] ? r16[7][0] : r16[7][2]);
+  const qf = [qfA1, qfA2, qfB1, qfB2];
+
+  const sfA = win(championName, thirdName);
+  const sfB = win(runnerUpName, fourthName);
+  const sf = [sfA, sfB];
+
+  return {
+    r16, qf, sf,
+    final:[championName, finalScore[0], runnerUpName, finalScore[1]],
+    bronze: thirdScore ? [thirdName, thirdScore[0], fourthName, thirdScore[1]] : win(thirdName, fourthName),
+  };
+}
+
+function getYearDetail(entry){
+  if(entry.isLive){
+    return { group: liveGroupFor(entry.champion), bracket: liveBracketData() };
+  }
+  if(!entry._cache){
+    entry._cache = {
+      group: entry.group || generateGroupTable(entry.year, entry.champion),
+      bracket: entry.bracket ? {
+        ...entry.bracket,
+        final: [entry.champion, entry.finalScore[0], entry.runnerUp, entry.finalScore[1]],
+        bronze: (entry.third && entry.thirdScore) ? [entry.third, entry.thirdScore[0], entry.fourth, entry.thirdScore[1]] : null,
+      } : generateBracket(entry.year, entry.champion, entry.runnerUp, entry.finalScore, entry.third, entry.fourth, entry.thirdScore),
+    };
+  }
+  return entry._cache;
+}
+
+/* For the current, still-being-played 2042 tournament we show the REAL
+   live data from Grupos / Cuadro Eliminación instead of fictional filler. */
+function liveGroupFor(championName){
+  const t = TEAM_DATA.find(x=>x.name===championName);
+  if(!t) return generateGroupTable(2042, championName);
+  const st = computeStandings(t.group);
+  return {label:`GRUPO ${t.group}`, teams: st.map(r=>({name:teamName(r.code), pj:r.pj,g:r.pg,e:r.pe,p:r.pp,gf:r.gf,gc:r.gc,pts:r.pts}))};
+}
+function codeMatchToTuple(m){
+  const hn = m.homeName ? teamName(m.homeName) : '???';
+  const an = m.awayName ? teamName(m.awayName) : '???';
+  const hs = (m.hs!==null && m.hs!=='') ? Number(m.hs) : null;
+  const as = (m.as!==null && m.as!=='') ? Number(m.as) : null;
+  return [hn, hs, an, as];
+}
+function liveBracketData(){
+  const K = STATE.knockout;
+  return {
+    r16: K.r16.map(codeMatchToTuple),
+    qf: K.qf.map(codeMatchToTuple),
+    sf: K.sf.map(codeMatchToTuple),
+    final: codeMatchToTuple(K.final),
+    bronze: (K.bronze.homeName && K.bronze.awayName) ? codeMatchToTuple(K.bronze) : null,
+  };
+}
+
 function currentChampionEntry(){
   const K = STATE.knockout;
   const f = K.final;
@@ -504,67 +646,351 @@ function currentChampionEntry(){
   if(hs===as) return null;
   const champCode = hs>as ? f.homeName : f.awayName;
   const runnerCode = hs>as ? f.awayName : f.homeName;
-  const finalScore = hs>as ? `${hs}-${as} ${teamName(runnerCode)}` : `${as}-${hs} ${teamName(runnerCode)}`;
-  let thirdText = null;
+  let third=null, fourth=null, thirdScore=null;
   const br = K.bronze;
   if(br.hs!==null && br.as!==null && br.hs!=='' && br.as!=='' && br.homeName && br.awayName){
     const bhs=Number(br.hs), bas=Number(br.as);
     if(bhs!==bas){
-      thirdText = bhs>bas ? `${teamName(br.homeName)} ${bhs}-${bas} ${teamName(br.awayName)}` : `${teamName(br.awayName)} ${bas}-${bhs} ${teamName(br.homeName)}`;
+      third = bhs>bas ? teamName(br.homeName) : teamName(br.awayName);
+      fourth = bhs>bas ? teamName(br.awayName) : teamName(br.homeName);
+      thirdScore = bhs>bas ? [bhs,bas] : [bas,bhs];
     }
   }
-  return {year:2042, host:teamName(champCode), iso:ISO_MAP[champCode], final:finalScore, third:thirdText, balon:null, goleador:null, fairplay:null, star:1, current:true};
+  return {
+    year:2042, champion:teamName(champCode), runnerUp:teamName(runnerCode),
+    finalScore: hs>as?[hs,as]:[as,hs], third, fourth, thirdScore,
+    balon:null, goleador:null, fairplay:null, current:true, isLive:true,
+  };
 }
+
+function allHallEntries(){
+  const current = currentChampionEntry();
+  return current ? [...HISTORY, current] : HISTORY;
+}
+
+function countryStats(name){
+  const all = allHallEntries();
+  const titles = all.filter(h=>h.champion===name);
+  const subs = all.filter(h=>h.runnerUp===name);
+  const thirds = all.filter(h=>h.third===name);
+  const latestTitle = titles.length ? Math.max(...titles.map(h=>h.year)) : null;
+  return {
+    titles: titles.length, subs: subs.length, thirds: thirds.length,
+    years: titles.map(h=>h.year).sort((a,b)=>b-a),
+    latestTitle,
+    isVigente: latestTitle === Math.max(...all.map(h=>h.year)),
+    participaciones: 8 + titles.length*2 + subs.length, // decorative fictional figure
+  };
+}
+
+/* Optional local photos: drop files into the paths below (inside the repo)
+   and they'll appear automatically; until then a themed gradient shows instead. */
+function assetImg(src, alt, cls){
+  return `<img src="${src}" alt="${alt}" class="${cls||''}" loading="lazy" onerror="this.classList.add('img-missing')">`;
+}
+
+let famaNav = {view:'ranking', country:null, year:null, tab:'grupos', search:''};
 
 function renderFama(){
   const current = currentChampionEntry();
-  const all = [...HISTORY, current || {year:2042, host:null, iso:null, final:null, third:null, pending:true}];
+  const all = allHallEntries();
+  const champions = [...new Set(all.map(h=>h.champion))]
+    .map(name=> ({name, ...countryStats(name)}))
+    .sort((a,b)=> b.titles-a.titles || b.latestTitle-a.latestTitle);
 
-  const cardsHtml = all.map(h=>{
-    if(h.pending){
-      return `
-      <div class="fama-card current pending">
-        <div class="fama-year-bg">2042</div>
-        <div class="fama-year">2042 · MUNDIAL EN CURSO</div>
-        <div class="fama-title">¿QUIÉN LEVANTARÁ LA COPA?</div>
-        <div class="fama-result">Torneo en disputa · ${playedCount()}/${STATE.matches.length} partidos jugados</div>
-        <div class="fama-pending">Completá la final en el Cuadro de Eliminación para revelar al campeón.</div>
-      </div>`;
-    }
-    return `
-    <div class="fama-card ${h.current?'current':''}">
-      <div class="fama-year-bg">${h.year}</div>
-      <div class="fama-flag">${flagImgIso(h.iso, 'w80', h.host)}</div>
-      ${h.star ? `<div class="fama-star">${'★'.repeat(h.star)}</div>` : ''}
-      <div class="fama-year">${h.year} ${h.host.toUpperCase()}</div>
-      <div class="fama-title">Final</div>
-      <div class="fama-result">${h.final}</div>
-      ${h.third ? `<div class="fama-sub">Tercero ${h.third}</div>` : ''}
-      <div class="fama-tags">
-        <div class="fama-tag ${h.balon?'gold':''}"><div class="fama-tag-label">Balón</div><div class="fama-tag-value">${h.balon||'Sin datos'}</div></div>
-        <div class="fama-tag ${h.goleador?'gold':''}"><div class="fama-tag-label">Goleador</div><div class="fama-tag-value">${h.goleador||'Sin datos'}</div></div>
-        <div class="fama-tag ${h.fairplay?'gold':''}"><div class="fama-tag-label">Fair Play</div><div class="fama-tag-value">${h.fairplay||'Sin datos'}</div></div>
-      </div>
-    </div>`;
-  }).join('');
+  const subnav = `
+  <div class="fama-topbar">
+    <div class="fama-subnav">
+      ${['ranking','todos','stats','historia','acerca'].map(v=>`
+        <button class="fama-tab ${famaNav.view===v?'active':''}" data-famanav="${v}">${{
+          ranking:'Ranking', todos:'Todos los Mundiales', stats:'Estadísticas', historia:'Historia', acerca:'Acerca de'
+        }[v]}</button>`).join('')}
+    </div>
+    <div class="fama-search">
+      <input type="text" id="famaSearch" placeholder="Buscar país..." value="${famaNav.search}">
+    </div>
+  </div>`;
 
-  const champCounts = {};
-  HISTORY.forEach(h=> champCounts[h.host] = (champCounts[h.host]||0)+1);
-  if(current) champCounts[current.host] = (champCounts[current.host]||0)+1;
-  const chipsHtml = Object.entries(champCounts).map(([name,count])=>{
-    const entry = [...HISTORY, current].find(h=>h && h.host===name);
-    return `<div class="champ-chip">${flagImgIso(entry.iso,'w40',name)} ${name} ${'★'.repeat(count)}</div>`;
-  }).join('');
+  let body = '';
+  if(famaNav.view==='country' && famaNav.country) body = renderCountryDetail(famaNav.country, champions, all);
+  else if(famaNav.view==='mundial' && famaNav.year) body = renderMundialDetail(famaNav.year, all);
+  else if(famaNav.view==='todos') body = renderFamaTodos(all);
+  else if(famaNav.view==='stats') body = renderFamaStats(champions, all);
+  else if(famaNav.view==='historia') body = renderFamaHistoria(all);
+  else if(famaNav.view==='acerca') body = renderFamaAcerca();
+  else body = renderFamaRanking(champions, current);
 
   return `
-  <h1 class="page-title">Salón de la Fama</h1>
-  <div class="panel" style="padding:18px 20px;margin-bottom:22px;">
-    <div class="panel-title" style="margin-bottom:12px;">Campeones de la historia</div>
-    <div class="champions-strip">${chipsHtml || '<span style="color:var(--muted)">Aún sin campeones registrados.</span>'}</div>
+  <div class="fama-hero">
+    <div class="fama-hero-trophy">${assetImg('assets/mundiales/trophy.png','Copa del Mundo','fama-trophy-img')}<span class="fama-trophy-fallback">🏆</span></div>
+    <div>
+      <h1 class="page-title" style="margin-bottom:4px;">Salón de la Fama</h1>
+      <div class="fama-hero-sub">de los Mundiales</div>
+    </div>
   </div>
-  <div class="fama-grid">${cardsHtml}</div>
+  ${subnav}
+  ${body}
+  <div class="fama-footer-note">Los datos y resultados son ficticios y con fines de entretenimiento.</div>
   `;
 }
+
+function renderFamaRanking(champions, current){
+  const top = champions.slice(0,4);
+  const cards = top.map((c,i)=>`
+    <div class="rank-card" data-country="${c.name}">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-flag">${flagByCountryName(c.name,'w80')}</div>
+      <div class="rank-name">${c.name}</div>
+      <div class="rank-titles">${c.titles} MUNDIAL${c.titles!==1?'ES':''}</div>
+      ${c.isVigente ? '<div class="rank-badge">VIGENTE CAMPEÓN</div>' : ''}
+      <div class="rank-years">${c.years.join(' · ')}</div>
+    </div>`).join('');
+
+  const gridCards = champions.map(c=>`
+    <div class="country-card" data-country="${c.name}">
+      <div class="country-card-bg">${assetImg(`assets/countries/${isoForName(c.name)||'xx'}.jpg`, c.name, 'country-bg-img')}</div>
+      <div class="country-card-flag">${flagByCountryName(c.name,'w80')}</div>
+      <div class="country-card-name">${c.name.toUpperCase()}</div>
+    </div>`).join('');
+
+  return `
+  <div class="ranking-title">
+    <span class="ranking-deco">✦</span> RANKING HISTÓRICO <span class="ranking-deco">✦</span>
+  </div>
+  <div class="ranking-sub">Los países que hicieron historia en la Copa del Mundo</div>
+  <div class="rank-grid">${cards}</div>
+  <div class="section-label">Tocá un país para ver su historia</div>
+  <div class="country-grid">${gridCards}</div>
+  `;
+}
+
+function renderFamaTodos(all){
+  const sorted = [...all].sort((a,b)=>b.year-a.year);
+  const rows = sorted.map(h=>`
+    <div class="mundial-row" data-year="${h.year}">
+      <div class="mundial-row-year">${h.year}</div>
+      <div class="mundial-row-flag">${h.champion ? flagByCountryName(h.champion,'w40') : '<span class="flag-fallback">❔</span>'}</div>
+      <div class="mundial-row-info">
+        <div class="mundial-row-champ">${h.champion || '¿Por definir?'}</div>
+        <div class="mundial-row-tag">${h.isLive ? (h.champion?'Vigente':'En curso') : 'Campeón'}</div>
+      </div>
+      <div class="mundial-row-arrow">›</div>
+    </div>`).join('');
+  return `
+  <div class="panel" style="padding:20px;">
+    <div class="panel-title" style="margin-bottom:4px;">Todos los Mundiales</div>
+    <div class="ranking-sub" style="margin:0 0 16px;">Explorá la historia completa de la Copa del Mundo</div>
+    <div class="mundial-list">${rows}</div>
+  </div>`;
+}
+
+function renderFamaStats(champions, all){
+  const totalTitles = all.filter(h=>h.champion).length;
+  const rows = champions.map(c=>`
+    <tr class="clickable" data-country="${c.name}">
+      <td class="team-cell"><span class="flag">${flagByCountryName(c.name,'w40')}</span>${c.name}</td>
+      <td class="num">${c.titles}</td>
+      <td class="num">${c.subs}</td>
+      <td class="num">${c.thirds}</td>
+      <td class="num">${c.participaciones}</td>
+    </tr>`).join('');
+  return `
+  <div class="stat-grid" style="margin-bottom:20px;">
+    <div class="stat-card"><div class="stat-value">${totalTitles}</div><div class="stat-label">Ediciones jugadas</div></div>
+    <div class="stat-card"><div class="stat-value">${champions.length}</div><div class="stat-label">Países campeones</div></div>
+    <div class="stat-card"><div class="stat-value">${champions[0]?champions[0].name:'—'}</div><div class="stat-label">Máximo ganador</div></div>
+    <div class="stat-card"><div class="stat-value">32</div><div class="stat-label">Selecciones en 2042</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Tabla histórica</div></div>
+    <table>
+      <thead><tr><th>País</th><th class="num">Títulos</th><th class="num">Subcamp.</th><th class="num">3ºs puestos</th><th class="num">Particip.</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderFamaHistoria(all){
+  const sorted = [...all].filter(h=>h.champion).sort((a,b)=>a.year-b.year);
+  const items = sorted.map(h=>`
+    <div class="history-item">
+      <div class="history-year">${h.year}</div>
+      <div class="history-dot"></div>
+      <div class="history-content">
+        <div class="history-title">${flagByCountryName(h.champion,'w40')} ${h.champion} se consagra campeón</div>
+        <div class="history-desc">Venció en la final a ${h.runnerUp} por ${h.finalScore[0]}-${h.finalScore[1]}${h.third?`, con ${h.third} quedándose el tercer puesto`:''}.</div>
+      </div>
+    </div>`).join('');
+  return `
+  <div class="panel" style="padding:24px;">
+    <div class="panel-title" style="margin-bottom:16px;">Línea de tiempo</div>
+    <div class="history-timeline">${items}</div>
+  </div>`;
+}
+
+function renderFamaAcerca(){
+  return `
+  <div class="panel" style="padding:28px;max-width:640px;">
+    <div class="panel-title" style="margin-bottom:12px;">Acerca del Salón de la Fama</div>
+    <p style="color:var(--muted);line-height:1.7;font-size:14px;">
+      El Salón de la Fama reúne la historia completa del Mundial 2042 y sus ediciones anteriores:
+      campeones, finales, tablas de grupo y cuadros de eliminación directa. Es la sección de
+      honor de la app <strong style="color:var(--ice)">Hielo Eterno</strong>, pensada para revivir
+      cada título con estilo de transmisión oficial.
+    </p>
+    <p style="color:var(--muted);line-height:1.7;font-size:14px;margin-top:10px;">
+      ¿Querés sumar fotos reales de estadios, la copa o las celebraciones? Subí tus imágenes a la
+      carpeta <code>assets/</code> del repositorio (mirá el detalle de nombres de archivo en el
+      README) y van a aparecer automáticamente acá.
+    </p>
+  </div>`;
+}
+
+function renderCountryDetail(name, champions, all){
+  const stats = countryStats(name);
+  const years = stats.years;
+  const selYear = famaNav.year && years.includes(famaNav.year) ? famaNav.year : years[0];
+  const entry = all.find(h=>h.year===selYear && h.champion===name);
+  const iso = isoForName(name);
+
+  return `
+  <button class="back-link" data-back="ranking">← Volver al ranking</button>
+  <div class="detail-hero">
+    <div class="detail-hero-bg">${assetImg(`assets/countries/${iso||'xx'}-hero.jpg`, name, 'detail-bg-img')}</div>
+    <div class="detail-hero-content">
+      <div class="detail-flag">${flagByCountryName(name,'w160')}</div>
+      <div>
+        <h2 class="detail-name">${name} ${stats.isVigente?'<span class="rank-badge inline">VIGENTE CAMPEÓN</span>':''}</h2>
+        <div class="detail-titles">${stats.titles} MUNDIAL${stats.titles!==1?'ES':''} <span class="detail-star">★</span> ${years.join(' · ')}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="panel stat-box">
+      <div class="panel-title" style="margin-bottom:12px;">Sobre ${name} en los mundiales</div>
+      <div class="stat-row"><span>Participaciones</span><strong>${stats.participaciones}</strong></div>
+      <div class="stat-row"><span>Títulos</span><strong>${stats.titles}</strong></div>
+      <div class="stat-row"><span>Subcampeonatos</span><strong>${stats.subs}</strong></div>
+      <div class="stat-row"><span>Tercer puesto</span><strong>${stats.thirds}</strong></div>
+      <div class="stat-row"><span>Mejor actuación</span><strong>Campeón (${stats.latestTitle})</strong></div>
+    </div>
+
+    <div class="panel year-picker-panel">
+      <div class="panel-title" style="margin-bottom:12px;">Elegí un mundial para explorar</div>
+      <div class="year-chip-row">
+        ${years.map(y=>`<button class="year-chip ${y===selYear?'active':''}" data-year="${y}">${y} <span class="trophy-mini">🏆</span></button>`).join('')}
+      </div>
+      ${entry ? renderYearTabs(entry) : ''}
+    </div>
+  </div>
+  `;
+}
+
+function renderMundialDetail(year, all){
+  const entry = all.find(h=>h.year===year);
+  if(!entry) return `<div class="empty-note">No hay datos para ${year}.</div>`;
+  return `
+  <button class="back-link" data-back="todos">← Volver a todos los mundiales</button>
+  <div class="detail-hero small">
+    <div class="detail-hero-bg">${assetImg(`assets/mundiales/${year}.jpg`, `Mundial ${year}`, 'detail-bg-img')}</div>
+    <div class="detail-hero-content">
+      <div>
+        <h2 class="detail-name">Copa del Mundo ${year}</h2>
+        <div class="detail-titles">Campeón: ${entry.champion ? `${flagByCountryName(entry.champion,'w40')} ${entry.champion}` : 'Por definir'}</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel year-picker-panel">${renderYearTabs(entry)}</div>
+  `;
+}
+
+function renderYearTabs(entry){
+  const detail = getYearDetail(entry);
+  const tab = famaNav.tab === 'eliminatoria' ? 'eliminatoria' : 'grupos';
+  return `
+  <div class="year-tabs">
+    <button class="year-tab-btn ${tab==='grupos'?'active':''}" data-yeartab="grupos">Fase de Grupos</button>
+    <button class="year-tab-btn ${tab==='eliminatoria'?'active':''}" data-yeartab="eliminatoria">Fase Eliminatoria</button>
+  </div>
+  ${tab==='grupos' ? renderMiniGroup(detail.group, entry.year) : renderMiniBracket(detail.bracket)}
+  `;
+}
+
+function renderMiniGroup(group, year){
+  const rows = group.teams.map((t,i)=>`
+    <tr class="${i<2?'qualified':''}">
+      <td class="num">${i+1}</td>
+      <td class="team-cell"><span class="flag">${flagByCountryName(t.name,'w40')}</span>${t.name}</td>
+      <td class="num">${t.pj}</td><td class="num">${t.g}</td><td class="num">${t.e}</td><td class="num">${t.p}</td>
+      <td class="num">${t.gf}</td><td class="num">${t.gc}</td><td class="num">${t.gf-t.gc>=0?'+':''}${t.gf-t.gc}</td>
+      <td class="num pts-cell">${t.pts}</td>
+    </tr>`).join('');
+  return `
+  <div class="mini-group-label">${group.label} · MUNDIAL ${year}</div>
+  <table>
+    <thead><tr><th>POS</th><th>PAÍS</th><th class="num">PJ</th><th class="num">G</th><th class="num">E</th><th class="num">P</th><th class="num">GF</th><th class="num">GC</th><th class="num">DG</th><th class="num">PTS</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function miniMatch(match){
+  if(!match) return `<div class="mm"><div class="mm-team">???</div><div class="mm-team">???</div></div>`;
+  const [hn,hs,an,as,pen] = match;
+  const decided = hs!==null && as!==null && hs!=='' && as!=='';
+  const hWin = pen ? pen==='home' : (decided && hs>as);
+  const aWin = pen ? pen==='away' : (decided && as>hs);
+  const hDisp = (hs===null||hs==='') ? '–' : hs;
+  const aDisp = (as===null||as==='') ? '–' : as;
+  return `<div class="mm">
+    <div class="mm-team ${hWin?'win':''}"><span class="flag">${flagByCountryName(hn,'w40')}</span>${hn}<b>${hDisp}${pen==='home'?'*':''}</b></div>
+    <div class="mm-team ${aWin?'win':''}"><span class="flag">${flagByCountryName(an,'w40')}</span>${an}<b>${aDisp}${pen==='away'?'*':''}</b></div>
+  </div>`;
+}
+
+function renderMiniBracket(bracket){
+  const f = bracket.final;
+  const finalDecided = f && f[1]!==null && f[3]!==null && f[1]!=='' && f[3]!=='';
+  const champName = finalDecided ? (f[1]>f[3]?f[0]:f[2]) : null;
+  return `
+  <div class="mini-bracket">
+    <div class="mb-col"><div class="mb-label">Octavos</div>${bracket.r16.map(miniMatch).join('')}</div>
+    <div class="mb-col"><div class="mb-label">Cuartos</div>${bracket.qf.map(miniMatch).join('')}</div>
+    <div class="mb-col"><div class="mb-label">Semifinales</div>${bracket.sf.map(miniMatch).join('')}</div>
+    <div class="mb-col final">
+      <div class="mb-label">Final</div>
+      ${miniMatch(bracket.final)}
+      ${champName ? `<div class="mb-champion">🏆 <span>${champName}</span></div>` : `<div class="mb-champion pending">🏆 <span>Por definir</span></div>`}
+      ${bracket.bronze?`<div class="mb-bronze-label">Tercer puesto</div>${miniMatch(bracket.bronze)}`:''}
+    </div>
+  </div>`;
+}
+
+function attachFamaEvents(){
+  content.querySelectorAll('[data-famanav]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ famaNav.view = btn.dataset.famanav; famaNav.country=null; famaNav.year=null; render(); });
+  });
+  const search = document.getElementById('famaSearch');
+  if(search) search.addEventListener('input', (e)=>{ famaNav.search = e.target.value; /* filtering hook available for future use */ });
+
+  content.querySelectorAll('[data-country]').forEach(el=>{
+    el.addEventListener('click', ()=>{ famaNav.view='country'; famaNav.country=el.dataset.country; famaNav.year=null; famaNav.tab='grupos'; render(); });
+  });
+  content.querySelectorAll('[data-year].mundial-row, .mundial-row[data-year]').forEach(el=>{
+    el.addEventListener('click', ()=>{ famaNav.view='mundial'; famaNav.year=Number(el.dataset.year); famaNav.tab='grupos'; render(); });
+  });
+  content.querySelectorAll('.year-chip').forEach(el=>{
+    el.addEventListener('click', ()=>{ famaNav.year=Number(el.dataset.year); famaNav.tab='grupos'; render(); });
+  });
+  content.querySelectorAll('[data-yeartab]').forEach(el=>{
+    el.addEventListener('click', ()=>{ famaNav.tab=el.dataset.yeartab; render(); });
+  });
+  content.querySelectorAll('[data-back]').forEach(el=>{
+    el.addEventListener('click', ()=>{ famaNav.view=el.dataset.back; famaNav.country=null; famaNav.year=null; render(); });
+  });
+}
+
+
 
 /* ---------------- AJUSTES ---------------- */
 function renderAjustes(){
