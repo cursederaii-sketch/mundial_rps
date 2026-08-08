@@ -142,7 +142,7 @@ function defaultState(){
 
   return {
     profile:{name:'DT IPFT', color:'#f2c230', desc:'Estratega polar. Cazador de auroras.', pronouns:'él/he', follows:'ARG', avatar:null, banner:null},
-    settings:{grad1:'#7c5cff', grad2:'#0a1931', device:'desktop'},
+    settings:{grad1:'#7c5cff', grad2:'#0a1931', device:'desktop', notifications:true},
     admin:{unlocked:false},
     matches,
     knockout: buildEmptyKnockout(),
@@ -352,18 +352,29 @@ function renderAchievements(){
 }
 
 /* ---------------- Amigos ---------------- */
+/* Tope para sincronizar avatar/banner a Firebase (en caracteres base64).
+   Evita escrituras gigantes; si la imagen supera esto, se guarda igual
+   local (en este navegador) pero otros usuarios verán solo la inicial. */
+const MAX_SYNC_IMG_CHARS = 300000;
+
 function ensureMySocialProfile(){
   if(typeof db==='undefined') return;
+  const avatarToSync = (STATE.profile.avatar && STATE.profile.avatar.length <= MAX_SYNC_IMG_CHARS) ? STATE.profile.avatar : null;
+  const bannerToSync = (STATE.profile.banner && STATE.profile.banner.length <= MAX_SYNC_IMG_CHARS) ? STATE.profile.banner : null;
   db.ref('social/users/'+MY_TAG).update({
     name: STATE.profile.name,
     color: STATE.profile.color,
     desc: STATE.profile.desc,
     pronouns: STATE.profile.pronouns,
     follows: STATE.profile.follows,
+    avatar: avatarToSync,
+    banner: bannerToSync,
     role: roleForCount(computeAchievements().filter(a=>a.unlocked).length),
     lastSeen: Date.now()
   });
 }
+
+function isAdmin(){ return !!(STATE.admin && STATE.admin.unlocked); }
 
 function initialOf(name){ return (name||'?').trim().charAt(0).toUpperCase() || '?'; }
 function avatarCircle(name, color, size){
@@ -383,10 +394,12 @@ function openFriendProfile(tag){
     document.getElementById('fpTag').textContent = tag;
     document.getElementById('fpRole').textContent = v.role || 'Novato';
     const heroColor = v.color || '#8b6bff';
-    document.getElementById('friendProfileHero').style.background = `linear-gradient(135deg, ${heroColor}, #1a1400)`;
-    document.getElementById('friendProfileAvatar').style.background = `linear-gradient(135deg, ${heroColor}, #1a1400)`;
+    const hero = document.getElementById('friendProfileHero');
+    const avatarEl = document.getElementById('friendProfileAvatar');
+    hero.style.background = v.banner ? `center/cover no-repeat url(${v.banner})` : `linear-gradient(135deg, ${heroColor}, #1a1400)`;
+    avatarEl.style.background = v.avatar ? `center/cover no-repeat url(${v.avatar})` : `linear-gradient(135deg, ${heroColor}, #1a1400)`;
     const fpInitial = document.getElementById('fpAvatarInitial');
-    if(fpInitial) fpInitial.textContent = initialOf(v.name || tag);
+    if(fpInitial) fpInitial.textContent = v.avatar ? '' : initialOf(v.name || tag);
     FRIEND_COLORS[tag] = heroColor;
     document.getElementById('friendProfileModal').classList.add('open');
   }).catch(()=>{});
@@ -488,28 +501,77 @@ function setChatHeader(name, color, clickable){
   }
 }
 
+function notifyNewMessage(m, title){
+  if(STATE.settings.notifications===false) return;
+  if(typeof Notification==='undefined' || Notification.permission!=='granted') return;
+  const panelOpen = document.getElementById('chatPanel').classList.contains('open');
+  if(panelOpen && !document.hidden) return; // ya lo estás viendo en pantalla
+  const body = (m.type==='gif' || m.type==='image') ? '📷 Envió una imagen/GIF' : (m.text||'').slice(0,80);
+  try{ new Notification(title, {body, icon:'chat-icon.png'}); }catch(e){ /* ignore */ }
+}
+
 function attachMessagesListener(refPath){
   if(chatMsgsRefOff){ chatMsgsRefOff(); chatMsgsRefOff = null; }
   if(typeof db==='undefined') return;
   const ref = db.ref(refPath).limitToLast(200);
+  let lastSeenTs = Date.now();
+  const chanTitle = (document.getElementById('chatActiveName') && document.getElementById('chatActiveName').textContent) || 'Mundial 2042';
   const handler = (snap)=>{
     const val = snap.val() || {};
-    const msgs = Object.values(val).sort((a,b)=> a.ts-b.ts);
+    const msgs = Object.entries(val).map(([key,m])=>({...m, key})).sort((a,b)=> a.ts-b.ts);
+    msgs.forEach(m=>{
+      if(m.from!==MY_TAG && m.ts>lastSeenTs) notifyNewMessage(m, chanTitle);
+    });
+    if(msgs.length) lastSeenTs = Math.max(lastSeenTs, msgs[msgs.length-1].ts);
     const box = document.getElementById('chatMessages');
     if(!box) return;
     box.innerHTML = msgs.map(m=>{
       const time = new Date(m.ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
       const mine = m.from===MY_TAG?'mine':'theirs';
       const senderLabel = (ACTIVE_CHANNEL.type!=='friend' && m.from!==MY_TAG) ? `<span class="chat-msg-sender">${escapeHtml(FRIEND_NAMES[m.from]||m.from)}</span>` : '';
+      const canDelete = m.from===MY_TAG || isAdmin();
+      const delBtn = canDelete ? `<button class="msg-del-btn" data-key="${m.key}" title="Borrar mensaje">✕</button>` : '';
       if(m.type==='gif' || m.type==='image'){
-        return `<div class="chat-msg ${mine} gif-msg">${senderLabel}<img src="${m.text}" alt="${m.type}" loading="lazy"><span class="chat-msg-time">${time}</span></div>`;
+        return `<div class="chat-msg ${mine} gif-msg">${delBtn}${senderLabel}<img src="${m.text}" alt="${m.type}" loading="lazy"><span class="chat-msg-time">${time}</span></div>`;
       }
-      return `<div class="chat-msg ${mine}">${senderLabel}${escapeHtml(m.text)}<span class="chat-msg-time">${time}</span></div>`;
+      return `<div class="chat-msg ${mine}">${delBtn}${senderLabel}${escapeHtml(m.text)}<span class="chat-msg-time">${time}</span></div>`;
     }).join('');
+    box.querySelectorAll('.msg-del-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(!confirm('¿Borrar este mensaje?')) return;
+        db.ref(refPath+'/'+btn.dataset.key).remove();
+      });
+    });
     box.scrollTop = box.scrollHeight;
   };
   ref.on('value', handler);
   chatMsgsRefOff = ()=> ref.off('value', handler);
+  attachTypingListener(refPath.replace(/\/messages$/, '/typing'));
+}
+
+let typingRefOff = null;
+let typingTimeout = null;
+function typingBasePath(){
+  const refPath = currentSendRef();
+  return refPath ? refPath.replace(/\/messages$/, '/typing') : null;
+}
+function attachTypingListener(basePath){
+  if(typingRefOff){ typingRefOff(); typingRefOff = null; }
+  if(typeof db==='undefined' || !basePath) return;
+  const ref = db.ref(basePath);
+  const handler = (snap)=>{
+    const val = snap.val() || {};
+    const names = Object.keys(val).filter(t=> t!==MY_TAG).map(t=> val[t]);
+    const el = document.getElementById('typingIndicator');
+    if(!el) return;
+    if(names.length===0){ el.textContent=''; el.style.display='none'; return; }
+    const text = names.length===1 ? `${names[0]} está escribiendo…` : `${names.slice(0,2).join(', ')} están escribiendo…`;
+    el.textContent = text;
+    el.style.display = 'block';
+  };
+  ref.on('value', handler);
+  typingRefOff = ()=> ref.off('value', handler);
 }
 
 function showActiveChatUI(){
@@ -525,6 +587,7 @@ function openChat(tag){
   showActiveChatUI();
   setChatHeader(FRIEND_NAMES[tag] || tag, FRIEND_COLORS[tag], true);
   document.getElementById('chatActiveHeader').onclick = ()=> openFriendProfile(tag);
+  document.getElementById('chatMembersBtn').classList.remove('show');
   const chatId = [MY_TAG, tag].sort().join('__');
   attachMessagesListener('social/chats/'+chatId+'/messages');
 }
@@ -536,6 +599,7 @@ function openGlobalChat(){
   showActiveChatUI();
   setChatHeader('Chat Global 🌍', '#2ec4b6', false);
   document.getElementById('chatActiveHeader').onclick = null;
+  document.getElementById('chatMembersBtn').classList.add('show');
   attachMessagesListener('social/global/messages');
 }
 
@@ -547,6 +611,7 @@ function openGroupChat(groupId){
   const g = GROUP_INFO[groupId];
   setChatHeader((g && g.name) || 'Grupo', '#7c5cff', false);
   document.getElementById('chatActiveHeader').onclick = null;
+  document.getElementById('chatMembersBtn').classList.add('show');
   attachMessagesListener('social/groupChats/'+groupId+'/messages');
 }
 
@@ -569,6 +634,9 @@ function sendChatMessage(){
   db.ref(refPath).push({from: MY_TAG, text, ts: Date.now()});
   bumpMsgCount();
   input.value = '';
+  clearTimeout(typingTimeout);
+  const base = typingBasePath();
+  if(base) db.ref(base+'/'+MY_TAG).remove();
 }
 
 /* ---------------- Grupos ---------------- */
@@ -861,6 +929,62 @@ document.getElementById('copyTag').addEventListener('click', async ()=>{
 
 document.getElementById('chatSendBtn').addEventListener('click', sendChatMessage);
 document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChatMessage(); });
+document.getElementById('chatInput').addEventListener('input', ()=>{
+  const base = typingBasePath();
+  if(!base || typeof db==='undefined') return;
+  db.ref(base+'/'+MY_TAG).set(STATE.profile.name || MY_TAG);
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(()=>{ db.ref(base+'/'+MY_TAG).remove(); }, 2500);
+});
+
+function openMembersModal(title, tags){
+  document.getElementById('membersModalTitle').textContent = title;
+  const list = document.getElementById('membersModalList');
+  if(!tags.length){
+    list.innerHTML = '<div class="empty-note" style="padding:6px 0;">Sin miembros para mostrar.</div>';
+  }else{
+    list.innerHTML = tags.map(t=>`
+      <button class="friend-item" data-mtag="${t}" style="width:100%;">
+        ${avatarCircle(FRIEND_NAMES[t]||t, FRIEND_COLORS[t], 26)}
+        <span class="friend-item-name">${escapeHtml(FRIEND_NAMES[t]||t)}</span>
+      </button>
+    `).join('');
+    list.querySelectorAll('[data-mtag]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.getElementById('membersModal').classList.remove('open');
+        openFriendProfile(btn.dataset.mtag);
+      });
+    });
+  }
+  document.getElementById('membersModal').classList.add('open');
+}
+document.getElementById('closeMembersModal').addEventListener('click', ()=> document.getElementById('membersModal').classList.remove('open'));
+document.getElementById('membersModal').addEventListener('click', (e)=>{ if(e.target.id==='membersModal') document.getElementById('membersModal').classList.remove('open'); });
+
+document.getElementById('chatMembersBtn').addEventListener('click', ()=>{
+  if(ACTIVE_CHANNEL.type==='group'){
+    const g = GROUP_INFO[ACTIVE_CHANNEL.id] || {};
+    const tags = Object.keys(g.members||{});
+    tags.forEach(t=>{
+      if(!FRIEND_NAMES[t] && typeof db!=='undefined'){
+        db.ref('social/users/'+t).once('value').then(snap=>{
+          const v = snap.val();
+          if(v){ FRIEND_NAMES[t]=v.name||t; FRIEND_COLORS[t]=v.color||'#8b6bff'; }
+        }).catch(()=>{});
+      }
+    });
+    openMembersModal(`MIEMBROS · ${g.name||'Grupo'}`, tags);
+  }else if(ACTIVE_CHANNEL.type==='global'){
+    if(typeof db==='undefined') return;
+    db.ref('social/users').once('value').then(snap=>{
+      const all = snap.val()||{};
+      const now = Date.now();
+      const online = Object.entries(all).filter(([t,v])=> v && v.lastSeen && (now-v.lastSeen) < 10*60*1000).map(([t])=>t);
+      online.forEach(t=>{ FRIEND_NAMES[t]=all[t].name||t; FRIEND_COLORS[t]=all[t].color||'#8b6bff'; });
+      openMembersModal(`EN LÍNEA · CHAT GLOBAL (${online.length})`, online);
+    }).catch(()=>{});
+  }
+});
 
 function teamByCode(code){ return TEAM_DATA.find(t=>t.code===code); }
 function teamLabel(code){ const t=teamByCode(code); return t ? `<span class="inline-flag">${flagImg(code,'w40')}</span> ${t.name}` : '???'; }
@@ -1724,6 +1848,13 @@ function renderAjustes(){
       <div class="device-opt ${STATE.settings.device==='desktop'?'active':''}" data-dev="desktop">PC · Sidebar 250px · 2 cols</div>
       <div class="device-opt ${STATE.settings.device==='mobile'?'active':''}" data-dev="mobile">Celular · Bottom Nav · 1 col</div>
     </div>
+
+    <div class="panel-title" style="margin-bottom:12px;margin-top:22px;">Notificaciones de chat</div>
+    <div class="device-options">
+      <div class="device-opt ${STATE.settings.notifications!==false?'active':''}" id="notifOn">Activadas</div>
+      <div class="device-opt ${STATE.settings.notifications===false?'active':''}" id="notifOff">Pausadas</div>
+    </div>
+    <p class="hint" style="margin-top:8px;">Te avisa cuando llega un mensaje nuevo y no estás mirando el chat en pantalla.</p>
   </div>
   `;
 }
@@ -1746,10 +1877,24 @@ function attachAjustesEvents(){
   g1.addEventListener('input', applyGrad);
   g2.addEventListener('input', applyGrad);
 
-  content.querySelectorAll('.device-opt').forEach(el=>{
+  content.querySelectorAll('.device-opt[data-dev]').forEach(el=>{
     el.addEventListener('click', ()=>{
       setDevice(el.dataset.dev);
     });
+  });
+
+  const notifOn = document.getElementById('notifOn');
+  const notifOff = document.getElementById('notifOff');
+  if(notifOn) notifOn.addEventListener('click', ()=>{
+    STATE.settings.notifications = true;
+    saveState();
+    if(typeof Notification!=='undefined' && Notification.permission==='default') Notification.requestPermission();
+    render();
+  });
+  if(notifOff) notifOff.addEventListener('click', ()=>{
+    STATE.settings.notifications = false;
+    saveState();
+    render();
   });
 }
 

@@ -232,6 +232,17 @@
   </div>
 </div>
 
+<!-- MEMBERS MODAL -->
+<div class="modal-overlay" id="membersModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" id="closeMembersModal">✕</button>
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="mini-label" id="membersModalTitle">MIEMBROS</div>
+      <div id="membersModalList" class="group-member-picker"></div>
+    </div>
+  </div>
+</div>
+
 <!-- CHAT FAB -->
 <button class="chat-fab" id="chatFab" title="Chat">
   <img src="chat-icon.png" alt="Chat" class="chat-fab-img">
@@ -283,8 +294,10 @@
           <div class="chat-active-header" id="chatActiveHeader">
             <span class="cah-avatar" id="chatActiveAvatar"></span>
             <span class="cah-name" id="chatActiveName"></span>
+            <button class="cah-members-btn" id="chatMembersBtn" title="Ver miembros">👥</button>
           </div>
           <div class="chat-messages" id="chatMessages"></div>
+          <div class="typing-indicator" id="typingIndicator"></div>
           <div class="gif-panel" id="gifPanel">
             <div class="gif-panel-search">
               <input type="text" id="gifSearchInput" placeholder="Buscar GIF…" maxlength="60">
