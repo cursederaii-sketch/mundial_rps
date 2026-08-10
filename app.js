@@ -144,6 +144,7 @@ function defaultState(){
     profile:{name:'DT IPFT', color:'#f2c230', desc:'Estratega polar. Cazador de auroras.', pronouns:'él/he', follows:'ARG', avatar:null, banner:null},
     settings:{grad1:'#7c5cff', grad2:'#0a1931', device:'desktop', notifications:true},
     admin:{unlocked:false},
+    awards:{fairplay:'', goleador:''},
     matches,
     knockout: buildEmptyKnockout(),
     view:'inicio',
@@ -1408,6 +1409,7 @@ function checkChampionCelebration(){
   if(champ && !STATE._celebrated){
     STATE._celebrated = true;
     fireConfetti();
+    maybeOfferTournamentDownload();
   }else if(!champ){
     STATE._celebrated = false;
   }
@@ -1451,6 +1453,107 @@ function generateBracketFromGroups(){
   if(!allGroupsComplete()){
     alert('Nota: algunos grupos aún no terminaron. El cuadro se armó con las posiciones actuales y puede cambiar.');
   }
+}
+
+/* ---------------- Resumen final del torneo (capturas + .txt) ---------------- */
+function allPlayedTeamMatches(){
+  const group = STATE.matches.filter(isPlayed).map(m=>({home:m.home, away:m.away, hs:Number(m.hs), as:Number(m.as)}));
+  const ko = allKnockoutMatches().filter(m=> m.homeName && m.awayName && isPlayed(m)).map(m=>({home:m.homeName, away:m.awayName, hs:Number(m.hs), as:Number(m.as)}));
+  return [...group, ...ko];
+}
+
+function biggestBlowoutText(){
+  const ms = allPlayedTeamMatches();
+  let best = null;
+  ms.forEach(m=>{
+    const diff = Math.abs(m.hs - m.as);
+    if(!best || diff > best.diff) best = {...m, diff};
+  });
+  if(!best || best.diff<=0) return null;
+  const winnerCode = best.hs>best.as ? best.home : best.away;
+  const loserCode = best.hs>best.as ? best.away : best.home;
+  const winnerScore = Math.max(best.hs,best.as), loserScore = Math.min(best.hs,best.as);
+  return `${teamName(winnerCode)} ${winnerScore}-${loserScore} ${teamName(loserCode)}`;
+}
+
+function bestDefenseText(){
+  const ms = allPlayedTeamMatches();
+  const gc = {}, pj = {};
+  ms.forEach(m=>{
+    gc[m.home] = (gc[m.home]||0) + m.as;
+    gc[m.away] = (gc[m.away]||0) + m.hs;
+    pj[m.home] = (pj[m.home]||0) + 1;
+    pj[m.away] = (pj[m.away]||0) + 1;
+  });
+  const codes = Object.keys(pj);
+  if(!codes.length) return null;
+  codes.sort((a,b)=> gc[a]-gc[b]);
+  const best = codes[0];
+  return `${teamName(best)} (${gc[best]} goles recibidos en ${pj[best]} partidos)`;
+}
+
+async function captureAndDownload(selector, filename){
+  const el = document.querySelector(selector);
+  if(!el || typeof html2canvas==='undefined') return;
+  const canvas = await html2canvas(el, {backgroundColor:'#0a1220', scale:2, useCORS:true});
+  await new Promise(resolve=>{
+    canvas.toBlob(blob=>{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      resolve();
+    }, 'image/png');
+  });
+}
+
+function downloadTournamentTxt(){
+  const champ = matchWinner(STATE.knockout.final);
+  const lines = [
+    'MUNDIAL 2042 · HIELO ETERNO — RESUMEN FINAL',
+    '',
+    `Campeón: ${champ ? teamName(champ) : '—'}`,
+    `Fair Play del torneo: ${STATE.awards.fairplay || 'A definir'}`,
+    `Goleador del torneo: ${STATE.awards.goleador || 'A definir'}`,
+    `Muro defensivo del torneo: ${bestDefenseText() || 'A definir'}`,
+    `Goleada del torneo: ${biggestBlowoutText() || 'A definir'}`,
+  ];
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'mundial-2042-premios.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function downloadTournamentSummary(){
+  if(typeof html2canvas === 'undefined'){ alert('No se pudo cargar la herramienta de capturas. Revisá tu conexión e intentá de nuevo.'); return; }
+  const originalView = STATE.view;
+
+  STATE.view = 'grupos';
+  render();
+  await new Promise(r=> setTimeout(r, 350));
+  await captureAndDownload('#content', 'mundial-2042-fase-grupos.png');
+
+  STATE.view = 'cuadro';
+  render();
+  await new Promise(r=> setTimeout(r, 350));
+  await captureAndDownload('.bracket-wrap', 'mundial-2042-cuadro-final.png');
+
+  STATE.view = originalView;
+  render();
+
+  downloadTournamentTxt();
+}
+
+function maybeOfferTournamentDownload(){
+  if(!isAdmin()) return;
+  setTimeout(()=>{
+    if(confirm('🏆 ¡Se coronó un campeón! ¿Querés descargar las capturas de la fase de grupos, el cuadro final y el resumen de premios del torneo?')){
+      downloadTournamentSummary();
+    }
+  }, 700);
 }
 
 /* ---------------- SALÓN DE LA FAMA ---------------- */
@@ -2043,6 +2146,23 @@ function renderAdmin(){
       <button class="btn-secondary" id="adminExport">Descargar JSON</button>
     </div>
     <div class="admin-box">
+      <h3>Premios del torneo</h3>
+      <p>Fair Play y Goleador se cargan a mano (no hay datos de jugadores para calcularlos solos). Se usan en el resumen final.</p>
+      <div class="field">
+        <label class="mini-label">Fair Play del torneo</label>
+        <input type="text" id="awardFairplay" maxlength="40" value="${escapeHtml(STATE.awards.fairplay||'')}" placeholder="Ej: Ghana">
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <label class="mini-label">Goleador del torneo</label>
+        <input type="text" id="awardGoleador" maxlength="40" value="${escapeHtml(STATE.awards.goleador||'')}" placeholder="Ej: Julian Alvarez (7 goles)">
+      </div>
+    </div>
+    <div class="admin-box">
+      <h3>Descargar resumen del torneo</h3>
+      <p>Genera 2 imágenes (fase de grupos completa y cuadro de eliminación completo, ambos con resultados) y un .txt con fair play, goleador, muro defensivo y goleada del torneo.</p>
+      <button class="btn-primary" id="adminDownloadSummary">Descargar resumen del torneo</button>
+    </div>
+    <div class="admin-box">
       <h3>Bloquear edición</h3>
       <p>Volver a Modo TV: solo lectura, sin poder tocar resultados.</p>
       <button class="btn-secondary" id="adminLock">Volver a Modo TV</button>
@@ -2068,6 +2188,15 @@ function attachAdminEvents(){
   });
   const exportBtn = document.getElementById('adminExport');
   if(exportBtn) exportBtn.addEventListener('click', exportData);
+  const ffInput = document.getElementById('awardFairplay');
+  if(ffInput) ffInput.addEventListener('input', ()=>{ STATE.awards.fairplay = ffInput.value; saveState(); });
+  const goInput = document.getElementById('awardGoleador');
+  if(goInput) goInput.addEventListener('input', ()=>{ STATE.awards.goleador = goInput.value; saveState(); });
+  const dlSummaryBtn = document.getElementById('adminDownloadSummary');
+  if(dlSummaryBtn) dlSummaryBtn.addEventListener('click', ()=>{
+    if(!matchWinner(STATE.knockout.final)){ alert('Todavía no hay un campeón coronado.'); return; }
+    downloadTournamentSummary();
+  });
   const lockBtn = document.getElementById('adminLock');
   if(lockBtn) lockBtn.addEventListener('click', ()=>{ STATE.admin.unlocked=false; saveState(); render(); });
 }
