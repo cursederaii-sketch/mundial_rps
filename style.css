@@ -721,7 +721,7 @@ textarea{ resize:vertical; }
 .chat-msg{ max-width:80%; padding:8px 11px; border-radius:12px; font-size:12.5px; line-height:1.45; word-wrap:break-word; position:relative; }
 .chat-msg.mine{ align-self:flex-end; background:linear-gradient(135deg, var(--teal), var(--blue)); color:#04150e; border-bottom-right-radius:3px; }
 .chat-msg.theirs{ align-self:flex-start; background:var(--panel-2); border:1px solid var(--line); border-bottom-left-radius:3px; }
-.chat-msg-sender{ display:block; font-size:10px; font-weight:800; color:var(--teal); margin-bottom:2px; }
+.chat-msg-sender{ display:block; font-size:10px; font-weight:800; color:var(--teal); margin-bottom:2px; cursor:pointer; }
 .chat-msg.mine .chat-msg-sender{ color:#04150e; opacity:.7; }
 .chat-msg-time{ font-size:9px; opacity:.6; margin-top:3px; display:block; }
 .msg-del-btn{

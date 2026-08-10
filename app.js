@@ -249,6 +249,7 @@ function initFirebaseSync(){
     if(remote.matches) STATE.matches = remote.matches;
     if(remote.knockout) STATE.knockout = remote.knockout;
     normalizeScores(STATE);
+    autoFillKnockoutFromGroups();
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
     render();
     applyingRemote = false;
@@ -304,8 +305,15 @@ let chatMsgsRefOff = null;
 function getMsgCount(){ return Number(localStorage.getItem('mundial2042_msgcount')||0); }
 function bumpMsgCount(){ localStorage.setItem('mundial2042_msgcount', String(getMsgCount()+1)); }
 
+function allKnockoutMatches(){
+  const K = STATE.knockout;
+  return [...K.r16, ...K.qf, ...K.sf, K.final, K.bronze];
+}
+
 function correctPredictionsCount(){
-  return STATE.matches.filter(m=>{
+  const koMatches = allKnockoutMatches().filter(m=> m.homeName && m.awayName);
+  const all = [...STATE.matches, ...koMatches];
+  return all.filter(m=>{
     const p = MY_PREDICTIONS[m.id];
     return p && isPlayed(m) && Number(p.hs)===Number(m.hs) && Number(p.as)===Number(m.as);
   }).length;
@@ -322,15 +330,21 @@ const ACHIEVEMENTS = [
   {id:'oracle', icon:'🔮', name:'Oráculo Polar', check:()=> correctPredictionsCount()>=1},
   {id:'visionary', icon:'🌟', name:'Visionario', check:()=> correctPredictionsCount()>=5},
   {id:'fanatic', icon:'🎖', name:'Fanático Total', check:()=> playedCount()>=STATE.matches.length && STATE.matches.length>0},
+  {id:'predictor_pro', icon:'📋', name:'Estratega Meticuloso', check:()=> Object.keys(MY_PREDICTIONS).length>=10},
+  {id:'perfectionist', icon:'🎯', name:'Predicción Perfecta', check:()=> correctPredictionsCount()>=10},
+  {id:'bracket_ready', icon:'🧊', name:'Cuadro en Marcha', check:()=> STATE.knockout.r16.every(m=>m.homeName && m.awayName)},
+  {id:'ten_friends', icon:'👥', name:'Círculo Ártico', check:()=> Object.keys(MY_FRIENDS).length>=10},
+  {id:'group_founder', icon:'🏕', name:'Fundador de Grupo', check:()=> Object.keys(MY_GROUPS).length>=1},
+  {id:'chatterbox', icon:'🗨', name:'Charlatán Polar', check:()=> getMsgCount()>=50},
 ];
 
 function computeAchievements(){ return ACHIEVEMENTS.map(a=>({...a, unlocked: !!a.check()})); }
 
 function roleForCount(n){
-  if(n>=8) return 'DT Supremo';
-  if(n>=6) return 'Leyenda';
-  if(n>=4) return 'Estratega';
-  if(n>=2) return 'Hincha';
+  if(n>=13) return 'DT Supremo';
+  if(n>=10) return 'Leyenda';
+  if(n>=6) return 'Estratega';
+  if(n>=3) return 'Hincha';
   return 'Novato';
 }
 
@@ -355,7 +369,7 @@ function renderAchievements(){
 /* Tope para sincronizar avatar/banner a Firebase (en caracteres base64).
    Evita escrituras gigantes; si la imagen supera esto, se guarda igual
    local (en este navegador) pero otros usuarios verán solo la inicial. */
-const MAX_SYNC_IMG_CHARS = 300000;
+const MAX_SYNC_IMG_CHARS = 4200000;
 
 function ensureMySocialProfile(){
   if(typeof db==='undefined') return;
@@ -523,12 +537,27 @@ function attachMessagesListener(refPath){
       if(m.from!==MY_TAG && m.ts>lastSeenTs) notifyNewMessage(m, chanTitle);
     });
     if(msgs.length) lastSeenTs = Math.max(lastSeenTs, msgs[msgs.length-1].ts);
+
+    // En chat global / de grupo aparecen mensajes de gente que todavía
+    // no es tu amiga, así que su nombre no está en FRIEND_NAMES. Antes
+    // de pintar los mensajes, buscamos el nombre real de cualquier
+    // remitente que no conozcamos todavía (en vez de mostrar su código).
+    const unknownSenders = [...new Set(msgs.map(m=>m.from))].filter(t=> t!==MY_TAG && !FRIEND_NAMES[t]);
+    if(unknownSenders.length && typeof db!=='undefined'){
+      Promise.all(unknownSenders.map(t=> db.ref('social/users/'+t).once('value').then(s=>{
+        const v = s.val();
+        FRIEND_NAMES[t] = (v && v.name) || t;
+        FRIEND_COLORS[t] = (v && v.color) || '#8b6bff';
+      }).catch(()=>{}))).then(()=> handler(snap));
+      return;
+    }
+
     const box = document.getElementById('chatMessages');
     if(!box) return;
     box.innerHTML = msgs.map(m=>{
       const time = new Date(m.ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
       const mine = m.from===MY_TAG?'mine':'theirs';
-      const senderLabel = (ACTIVE_CHANNEL.type!=='friend' && m.from!==MY_TAG) ? `<span class="chat-msg-sender">${escapeHtml(FRIEND_NAMES[m.from]||m.from)}</span>` : '';
+      const senderLabel = (ACTIVE_CHANNEL.type!=='friend' && m.from!==MY_TAG) ? `<span class="chat-msg-sender" data-tag="${m.from}">${escapeHtml(FRIEND_NAMES[m.from]||m.from)}</span>` : '';
       const canDelete = m.from===MY_TAG || isAdmin();
       const delBtn = canDelete ? `<button class="msg-del-btn" data-key="${m.key}" title="Borrar mensaje">✕</button>` : '';
       if(m.type==='gif' || m.type==='image'){
@@ -541,6 +570,12 @@ function attachMessagesListener(refPath){
         e.stopPropagation();
         if(!confirm('¿Borrar este mensaje?')) return;
         db.ref(refPath+'/'+btn.dataset.key).remove();
+      });
+    });
+    box.querySelectorAll('.chat-msg-sender').forEach(el=>{
+      el.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openFriendProfile(el.dataset.tag);
       });
     });
     box.scrollTop = box.scrollHeight;
@@ -844,6 +879,46 @@ function renderPredictions(){
       }
     });
   });
+
+  const koRounds = [
+    {label:'RONDA DE 16', ms: STATE.knockout.r16},
+    {label:'CUARTOS DE FINAL', ms: STATE.knockout.qf},
+    {label:'SEMIFINAL', ms: STATE.knockout.sf},
+    {label:'FINAL', ms: [STATE.knockout.final]},
+    {label:'TERCER PUESTO', ms: [STATE.knockout.bronze]},
+  ];
+  koRounds.forEach(({label, ms})=>{
+    const ready = ms.filter(m=> m.homeName && m.awayName);
+    if(ready.length===0) return;
+    html += `<div class="pred-group-label">${label}</div>`;
+    ready.forEach(m=>{
+      const p = MY_PREDICTIONS[m.id];
+      const teamsLabel = `${teamFlag(m.homeName)} ${teamFlag(m.awayName)} <span style="font-size:11px;color:var(--muted)">${teamName(m.homeName)} vs ${teamName(m.awayName)}</span>`;
+      if(isPlayed(m)){
+        let resultIcon = '';
+        if(p){
+          const correct = Number(p.hs)===Number(m.hs) && Number(p.as)===Number(m.as);
+          resultIcon = `<span class="pred-result ${correct?'correct':'wrong'}">${correct?'✓':'✗'}</span>`;
+        }
+        html += `<div class="pred-item">
+          <div class="pred-teams">${teamsLabel}</div>
+          <div style="font-size:11px;color:var(--muted)">${p?`${p.hs}-${p.as}`:'—'} · Real ${m.hs}-${m.as}</div>
+          ${resultIcon}
+        </div>`;
+      }else{
+        html += `<div class="pred-item">
+          <div class="pred-teams">${teamsLabel}</div>
+          <div class="pred-inputs">
+            <input type="number" min="0" max="20" id="predH_${m.id}" value="${p?p.hs:''}">
+            <span>-</span>
+            <input type="number" min="0" max="20" id="predA_${m.id}" value="${p?p.as:''}">
+          </div>
+          <button class="pred-save" data-id="${m.id}">Guardar</button>
+        </div>`;
+      }
+    });
+  });
+
   box.innerHTML = html || '<div class="empty-note">No hay partidos todavía.</div>';
   box.querySelectorAll('.pred-save').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -863,6 +938,11 @@ function renderPredictions(){
 function initSocial(){
   if(typeof firebase==='undefined' || typeof db==='undefined') return;
   ensureMySocialProfile();
+  // Late para que "en línea" (chat global) muestre a todos los que
+  // tienen la página abierta, no solo a quien acaba de entrar: sin este
+  // pulso, tu propio lastSeen quedaba fresco pero el de todos los demás
+  // se volvía viejo a los pocos minutos y desaparecían de la lista.
+  setInterval(()=>{ db.ref('social/users/'+MY_TAG).update({lastSeen: Date.now()}); }, 60000);
   renderEmojiPanel();
   db.ref('social/friends/'+MY_TAG).on('value', snap=>{
     MY_FRIENDS = snap.val() || {};
@@ -1159,6 +1239,7 @@ function attachGrupoEvents(){
       const val = e.target.value;
       m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
       saveTournament();
+      autoFillKnockoutFromGroups();
       updateSideProgress();
     });
   });
@@ -1297,6 +1378,29 @@ function propagateBracket(){
   K.bronze.homeName = matchLoser(K.sf[0]);
   K.bronze.awayName = matchLoser(K.sf[1]);
   checkChampionCelebration();
+}
+
+/* Va llenando automáticamente la Ronda de 16 apenas un grupo llega al
+   100% de partidos jugados, sin esperar a que el admin apriete
+   "Generar cuadro desde grupos" ni a que terminen todos los grupos. */
+function autoFillKnockoutFromGroups(){
+  const K = STATE.knockout;
+  let changed = false;
+  const assign = (slotIdx, side, group, which)=>{
+    if(!groupComplete(group)) return;
+    const st = computeStandings(group);
+    const code = which==='winner' ? st[0].code : st[1].code;
+    if(K.r16[slotIdx][side] !== code){ K.r16[slotIdx][side] = code; changed = true; }
+  };
+  assign(0,'homeName','A','winner'); assign(0,'awayName','B','runnerup');
+  assign(1,'homeName','C','winner'); assign(1,'awayName','D','runnerup');
+  assign(2,'homeName','B','winner'); assign(2,'awayName','A','runnerup');
+  assign(3,'homeName','D','winner'); assign(3,'awayName','C','runnerup');
+  assign(4,'homeName','E','winner'); assign(4,'awayName','F','runnerup');
+  assign(5,'homeName','G','winner'); assign(5,'awayName','H','runnerup');
+  assign(6,'homeName','F','winner'); assign(6,'awayName','E','runnerup');
+  assign(7,'homeName','H','winner'); assign(7,'awayName','G','runnerup');
+  if(changed){ propagateBracket(); saveTournament(); }
 }
 
 function checkChampionCelebration(){
