@@ -1326,7 +1326,13 @@ function attachCuadroEvents(){
       m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
       propagateBracket();
       saveTournament();
+      const selStart = e.target.selectionStart, selEnd = e.target.selectionEnd;
       render();
+      const restored = content.querySelector(`.bscore[data-match="${id}"][data-side="${side}"]`);
+      if(restored){
+        restored.focus();
+        try{ restored.setSelectionRange(selStart, selEnd); }catch(err){}
+      }
     });
   });
   const genBtn = document.getElementById('genBracket');
