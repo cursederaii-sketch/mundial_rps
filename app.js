@@ -1511,7 +1511,9 @@ async function captureAndDownload(selector, filename){
   try{
     const el = document.querySelector(selector);
     if(!el || typeof html2canvas==='undefined') return false;
-    const canvas = await html2canvas(el, {backgroundColor:'#0a1220', scale:2, useCORS:true});
+    const canvasPromise = html2canvas(el, {backgroundColor:'#0a1220', scale:2, useCORS:true, imageTimeout:8000, logging:false});
+    const timeoutPromise = new Promise((_, reject)=> setTimeout(()=> reject(new Error('Timeout: la captura tardó más de 12s (probablemente una imagen externa no cargó)')), 12000));
+    const canvas = await Promise.race([canvasPromise, timeoutPromise]);
     await new Promise((resolve, reject)=>{
       canvas.toBlob(blob=>{
         if(!blob){ reject(new Error('toBlob devolvió vacío')); return; }
@@ -1553,19 +1555,21 @@ async function downloadTournamentSummary(){
   const originalView = STATE.view;
   let ok1 = false, ok2 = false;
 
-  if(typeof html2canvas === 'undefined'){
-    console.error('html2canvas no está disponible.');
-  }else{
-    STATE.view = 'grupos';
-    render();
-    await new Promise(r=> setTimeout(r, 350));
-    ok1 = await captureAndDownload('#content', 'mundial-2042-fase-grupos.png');
+  try{
+    if(typeof html2canvas === 'undefined'){
+      console.error('html2canvas no está disponible.');
+    }else{
+      STATE.view = 'grupos';
+      render();
+      await new Promise(r=> setTimeout(r, 350));
+      ok1 = await captureAndDownload('#content', 'mundial-2042-fase-grupos.png');
 
-    STATE.view = 'cuadro';
-    render();
-    await new Promise(r=> setTimeout(r, 350));
-    ok2 = await captureAndDownload('.bracket-wrap', 'mundial-2042-cuadro-final.png');
-
+      STATE.view = 'cuadro';
+      render();
+      await new Promise(r=> setTimeout(r, 350));
+      ok2 = await captureAndDownload('.bracket-wrap', 'mundial-2042-cuadro-final.png');
+    }
+  }finally{
     STATE.view = originalView;
     render();
   }
@@ -1573,7 +1577,7 @@ async function downloadTournamentSummary(){
   downloadTournamentTxt();
 
   if(!ok1 || !ok2){
-    alert('El .txt de premios se descargó, pero una o ambas capturas de imagen fallaron. Abrí la consola del navegador (F12) y contame qué error aparece para poder arreglarlo del todo.');
+    alert('El .txt de premios se descargó, pero una o ambas capturas de imagen fallaron (probablemente por las banderas externas). Abrí la consola del navegador (F12) para ver el detalle exacto.');
   }
 }
 
