@@ -1508,19 +1508,26 @@ function bestDefenseText(){
 }
 
 async function captureAndDownload(selector, filename){
-  const el = document.querySelector(selector);
-  if(!el || typeof html2canvas==='undefined') return;
-  const canvas = await html2canvas(el, {backgroundColor:'#0a1220', scale:2, useCORS:true});
-  await new Promise(resolve=>{
-    canvas.toBlob(blob=>{
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      resolve();
-    }, 'image/png');
-  });
+  try{
+    const el = document.querySelector(selector);
+    if(!el || typeof html2canvas==='undefined') return false;
+    const canvas = await html2canvas(el, {backgroundColor:'#0a1220', scale:2, useCORS:true});
+    await new Promise((resolve, reject)=>{
+      canvas.toBlob(blob=>{
+        if(!blob){ reject(new Error('toBlob devolvió vacío')); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        resolve();
+      }, 'image/png');
+    });
+    return true;
+  }catch(err){
+    console.error('captureAndDownload falló para', selector, err);
+    return false;
+  }
 }
 
 function downloadTournamentTxt(){
@@ -1543,23 +1550,31 @@ function downloadTournamentTxt(){
 }
 
 async function downloadTournamentSummary(){
-  if(typeof html2canvas === 'undefined'){ alert('No se pudo cargar la herramienta de capturas. Revisá tu conexión e intentá de nuevo.'); return; }
   const originalView = STATE.view;
+  let ok1 = false, ok2 = false;
 
-  STATE.view = 'grupos';
-  render();
-  await new Promise(r=> setTimeout(r, 350));
-  await captureAndDownload('#content', 'mundial-2042-fase-grupos.png');
+  if(typeof html2canvas === 'undefined'){
+    console.error('html2canvas no está disponible.');
+  }else{
+    STATE.view = 'grupos';
+    render();
+    await new Promise(r=> setTimeout(r, 350));
+    ok1 = await captureAndDownload('#content', 'mundial-2042-fase-grupos.png');
 
-  STATE.view = 'cuadro';
-  render();
-  await new Promise(r=> setTimeout(r, 350));
-  await captureAndDownload('.bracket-wrap', 'mundial-2042-cuadro-final.png');
+    STATE.view = 'cuadro';
+    render();
+    await new Promise(r=> setTimeout(r, 350));
+    ok2 = await captureAndDownload('.bracket-wrap', 'mundial-2042-cuadro-final.png');
 
-  STATE.view = originalView;
-  render();
+    STATE.view = originalView;
+    render();
+  }
 
   downloadTournamentTxt();
+
+  if(!ok1 || !ok2){
+    alert('El .txt de premios se descargó, pero una o ambas capturas de imagen fallaron. Abrí la consola del navegador (F12) y contame qué error aparece para poder arreglarlo del todo.');
+  }
 }
 
 function maybeOfferTournamentDownload(){
