@@ -246,6 +246,7 @@ function initFirebaseSync(){
     const remote = snap.val();
     fbReady = true;
     if(!remote) return; // nothing in the DB yet — local state will seed it below
+    if(pendingPush) return; // a newer local edit hasn't been pushed yet — don't overwrite it with this older snapshot
     applyingRemote = true;
     if(remote.matches) STATE.matches = remote.matches;
     if(remote.knockout) STATE.knockout = remote.knockout;
