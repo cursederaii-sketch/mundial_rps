@@ -258,6 +258,9 @@ function initFirebaseSync(){
   });
 }
 
+let pendingPush = false; // true while a local edit is waiting to be pushed —
+                          // blocks incoming remote snapshots from clobbering it
+
 function syncToFirebase(){
   if(applyingRemote) return; // this save came from a remote update, don't echo it back
   if(!fbRef) return;
@@ -268,11 +271,15 @@ function syncToFirebase(){
     setTimeout(syncToFirebase, 300);
     return;
   }
+  pendingPush = true;
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
-    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout }).catch(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout }).then(()=>{
+      pendingPush = false;
+    }).catch(()=>{
       setLiveStatus(false, 'Error de sync');
+      pendingPush = false;
     });
   }, 250);
 }
