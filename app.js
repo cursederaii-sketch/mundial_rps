@@ -1507,32 +1507,31 @@ function bestDefenseText(){
   return `${teamName(best)} (${gc[best]} goles recibidos en ${pj[best]} partidos)`;
 }
 
-function normalizeColorFunctions(val){
-  if(!val || val.indexOf('color(') === -1) return val;
-  return val.replace(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/g, (m,r,g,b,a)=>{
-    const R = Math.round(parseFloat(r)*255), G = Math.round(parseFloat(g)*255), B = Math.round(parseFloat(b)*255);
-    return a !== undefined ? `rgba(${R}, ${G}, ${B}, ${a})` : `rgb(${R}, ${G}, ${B})`;
-  });
+/* html2canvas no entiende color-mix()/color(srgb ...). En vez de tocar el DOM
+   (que no cubre pseudo-elementos ni elementos fuera del área capturada, como
+   el fondo .aurora-bg), reescribimos el TEXTO de la hoja de estilos dentro
+   del documento clonado, quitando el color-mix() y dejando solo el color
+   dominante (pequeña pérdida de mezcla, pero ya no rompe el parser). */
+function stripColorMix(cssText){
+  if(!cssText) return cssText;
+  return cssText.replace(/color-mix\(\s*in\s+[a-z0-9\- ]+,\s*([^,]+?)\s+[\d.]+%\s*,\s*[^)]+\)/gi, '$1');
 }
 
-/* html2canvas no entiende color(srgb r g b) (forma en que algunos navegadores
-   serializan color-mix()). Antes de capturar, "aplanamos" esos valores ya
-   resueltos por el navegador a rgb()/rgba() plano en el DOM clonado. */
-function inlineResolvedColors(root, clonedRoot){
-  const props = ['backgroundColor','backgroundImage','background','color','borderTopColor','borderRightColor','borderBottomColor','borderLeftColor','outlineColor','boxShadow','textShadow','filter'];
-  const applyTo = (src, dst) => {
-    const cs = getComputedStyle(src);
-    props.forEach(p=>{
-      const val = normalizeColorFunctions(cs[p]);
-      if(val) dst.style[p] = val;
-    });
-  };
-  applyTo(root, clonedRoot);
-  const srcAll = root.querySelectorAll('*');
-  const dstAll = clonedRoot.querySelectorAll('*');
-  for(let i=0; i<srcAll.length && i<dstAll.length; i++){
-    applyTo(srcAll[i], dstAll[i]);
-  }
+async function rewriteStylesheetsForCapture(clonedDoc){
+  const links = Array.from(clonedDoc.querySelectorAll('link[rel="stylesheet"]'));
+  await Promise.all(links.map(async (link)=>{
+    try{
+      const res = await fetch(link.href);
+      const cssText = await res.text();
+      const fixed = stripColorMix(cssText);
+      const styleTag = clonedDoc.createElement('style');
+      styleTag.textContent = fixed;
+      link.parentNode.insertBefore(styleTag, link);
+      link.remove();
+    }catch(err){
+      console.warn('No se pudo reescribir stylesheet para captura:', link.href, err);
+    }
+  }));
 }
 
 async function captureAndDownload(selector, filename){
@@ -1541,10 +1540,7 @@ async function captureAndDownload(selector, filename){
     if(!el || typeof html2canvas==='undefined') return false;
     const canvasPromise = html2canvas(el, {
       backgroundColor:'#0a1220', scale:2, useCORS:true, imageTimeout:8000, logging:false,
-      onclone: (clonedDoc)=>{
-        const clonedRoot = clonedDoc.querySelector(selector);
-        if(clonedRoot) inlineResolvedColors(el, clonedRoot);
-      }
+      onclone: (clonedDoc)=> rewriteStylesheetsForCapture(clonedDoc)
     });
     const timeoutPromise = new Promise((_, reject)=> setTimeout(()=> reject(new Error('Timeout: la captura tardó más de 12s (probablemente una imagen externa no cargó)')), 12000));
     const canvas = await Promise.race([canvasPromise, timeoutPromise]);
