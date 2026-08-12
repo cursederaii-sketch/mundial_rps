@@ -1532,6 +1532,14 @@ async function rewriteStylesheetsForCapture(clonedDoc){
       console.warn('No se pudo reescribir stylesheet para captura:', link.href, err);
     }
   }));
+  /* Algunos elementos (ej. .champion-box) tienen animaciones CSS que hacen
+     pulsar un color (box-shadow). Mientras animan, el navegador interpola
+     ese color usando el espacio "oklab", que html2canvas no sabe parsear.
+     Apagamos animaciones/transiciones SOLO en el documento clonado (la
+     página real sigue animando normal) para que el color quede fijo y plano. */
+  const killAnim = clonedDoc.createElement('style');
+  killAnim.textContent = '*, *::before, *::after{ animation: none !important; transition: none !important; }';
+  clonedDoc.head.appendChild(killAnim);
 }
 
 async function captureAndDownload(selector, filename){
