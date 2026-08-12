@@ -2209,7 +2209,9 @@ function attachAdminEvents(){
   if(goInput) goInput.addEventListener('input', ()=>{ STATE.awards.goleador = goInput.value; saveState(); });
   const dlSummaryBtn = document.getElementById('adminDownloadSummary');
   if(dlSummaryBtn) dlSummaryBtn.addEventListener('click', ()=>{
-    if(!matchWinner(STATE.knockout.final)){ alert('Todavía no hay un campeón coronado.'); return; }
+    if(!matchWinner(STATE.knockout.final)){
+      if(!confirm('¿Estás seguro? El torneo aún no terminó. Se descargará el resumen con los resultados que haya hasta ahora.')) return;
+    }
     downloadTournamentSummary();
   });
   const lockBtn = document.getElementById('adminLock');
