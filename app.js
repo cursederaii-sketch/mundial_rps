@@ -1507,11 +1507,45 @@ function bestDefenseText(){
   return `${teamName(best)} (${gc[best]} goles recibidos en ${pj[best]} partidos)`;
 }
 
+function normalizeColorFunctions(val){
+  if(!val || val.indexOf('color(') === -1) return val;
+  return val.replace(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/g, (m,r,g,b,a)=>{
+    const R = Math.round(parseFloat(r)*255), G = Math.round(parseFloat(g)*255), B = Math.round(parseFloat(b)*255);
+    return a !== undefined ? `rgba(${R}, ${G}, ${B}, ${a})` : `rgb(${R}, ${G}, ${B})`;
+  });
+}
+
+/* html2canvas no entiende color(srgb r g b) (forma en que algunos navegadores
+   serializan color-mix()). Antes de capturar, "aplanamos" esos valores ya
+   resueltos por el navegador a rgb()/rgba() plano en el DOM clonado. */
+function inlineResolvedColors(root, clonedRoot){
+  const props = ['backgroundColor','backgroundImage','background','color','borderTopColor','borderRightColor','borderBottomColor','borderLeftColor','outlineColor','boxShadow','textShadow','filter'];
+  const applyTo = (src, dst) => {
+    const cs = getComputedStyle(src);
+    props.forEach(p=>{
+      const val = normalizeColorFunctions(cs[p]);
+      if(val) dst.style[p] = val;
+    });
+  };
+  applyTo(root, clonedRoot);
+  const srcAll = root.querySelectorAll('*');
+  const dstAll = clonedRoot.querySelectorAll('*');
+  for(let i=0; i<srcAll.length && i<dstAll.length; i++){
+    applyTo(srcAll[i], dstAll[i]);
+  }
+}
+
 async function captureAndDownload(selector, filename){
   try{
     const el = document.querySelector(selector);
     if(!el || typeof html2canvas==='undefined') return false;
-    const canvasPromise = html2canvas(el, {backgroundColor:'#0a1220', scale:2, useCORS:true, imageTimeout:8000, logging:false});
+    const canvasPromise = html2canvas(el, {
+      backgroundColor:'#0a1220', scale:2, useCORS:true, imageTimeout:8000, logging:false,
+      onclone: (clonedDoc)=>{
+        const clonedRoot = clonedDoc.querySelector(selector);
+        if(clonedRoot) inlineResolvedColors(el, clonedRoot);
+      }
+    });
     const timeoutPromise = new Promise((_, reject)=> setTimeout(()=> reject(new Error('Timeout: la captura tardó más de 12s (probablemente una imagen externa no cargó)')), 12000));
     const canvas = await Promise.race([canvasPromise, timeoutPromise]);
     await new Promise((resolve, reject)=>{
