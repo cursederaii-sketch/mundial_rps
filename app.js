@@ -1330,8 +1330,9 @@ function attachCuadroEvents(){
     inp.addEventListener('input', (e)=>{
       const id = e.target.dataset.match, side = e.target.dataset.side;
       const m = findKnockoutMatch(id);
+      const field = side === 'home' ? 'hs' : 'as';
       const val = e.target.value;
-      m[side] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
+      m[field] = val === '' ? null : Math.max(0, Math.min(20, Number(val)));
       propagateBracket();
       saveTournament();
       const selStart = e.target.selectionStart, selEnd = e.target.selectionEnd;
