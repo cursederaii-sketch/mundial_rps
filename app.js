@@ -2829,6 +2829,11 @@ function openSorteoModal(draft){
     document.getElementById('sorteoModal').classList.remove('open');
     startTournamentFromDraft(draft, assignment);
   };
+
+  document.getElementById('closeSorteoModal').onclick = ()=>{
+    clearInterval(timer);
+    document.getElementById('sorteoModal').classList.remove('open');
+  };
 }
 
 /* Confirma el sorteo: reemplaza el roster (TEAM_DATA/GROUP_LETTERS), arma
