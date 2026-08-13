@@ -2585,7 +2585,7 @@ document.querySelectorAll('.nav-item, .bn-item').forEach(btn=>{
 });
 
 /* ---------------- Init ---------------- */
-function init(){/* ---------------- Etapa 1: modal "Nuevo Torneo" ---------------- */
+/* ---------------- Etapa 1: modal "Nuevo Torneo" ---------------- */
 function openNewTournamentModal(){
   renderNewTournamentPicker();
   document.getElementById('newTournamentModal').classList.add('open');
@@ -2676,4 +2676,4 @@ function init(){
   initSocial();
 }
 
-init();}
+init();
