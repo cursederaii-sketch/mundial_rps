@@ -23,7 +23,7 @@ function flagImgIso(iso, size, alt){
   return `<img class="flag-ico" src="https://flagcdn.com/${size}/${iso}.png" alt="${alt||''}" loading="lazy">`;
 }
 function flagImg(code, size){
-  const iso = ISO_MAP[code];
+  const iso = ISO_MAP[code] || (COUNTRY_DB.find(c=>c.code===code)||{}).iso;
   const t = teamByCode(code);
   return flagImgIso(iso, size, t?t.name:code);
 }
@@ -46,7 +46,7 @@ function isoForName(name){
 }
 function flagByCountryName(name, size){ return flagImgIso(isoForName(name), size, name); }
 
-const TEAM_DATA = [
+let TEAM_DATA = [
   // group A
   {code:'ALE', name:'Alemania', flag:'🇩🇪', group:'A'},
   {code:'EEU', name:'Estados Unidos', flag:'🇺🇸', group:'A'},
@@ -89,7 +89,15 @@ const TEAM_DATA = [
   {code:'COL', name:'Colombia', flag:'🇨🇴', group:'H'},
 ];
 
-const GROUP_LETTERS = ['A','B','C','D','E','F','G','H'];
+let GROUP_LETTERS = ['A','B','C','D','E','F','G','H'];
+const ORIGINAL_TEAM_DATA = TEAM_DATA.slice();
+const ORIGINAL_GROUP_LETTERS = GROUP_LETTERS.slice();
+function GROUP_LETTERS_FOR(n){ return Array.from({length:n}, (_,i)=> String.fromCharCode(65+i)); }
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
 
 /* ---------------- Etapa 1: base de países para "Nuevo Torneo" ---------------- */
 const COUNTRY_DB = [
@@ -224,7 +232,8 @@ const HISTORY = [
     }},
 ];
 
-function defaultState(){
+function defaultState(format){
+  format = format || 32;
   const matches = [];
   GROUP_LETTERS.forEach(g=>{
     const teams = TEAM_DATA.filter(t=>t.group===g).map(t=>t.code);
@@ -240,21 +249,29 @@ function defaultState(){
     settings:{grad1:'#7c5cff', grad2:'#0a1931', device:'desktop', notifications:true},
     admin:{unlocked:false},
     awards:{fairplay:'', goleador:''},
+    format,
     matches,
-    knockout: buildEmptyKnockout(),
+    knockout: buildEmptyKnockout(format),
     view:'inicio',
   };
 }
 
-function buildEmptyKnockout(){
+/* format 48 agrega una ronda de Dieciseisavos (r32, 16 partidos) antes de
+   la Ronda de 16 ya existente. Todo lo demás (qf/sf/final/bronze) es igual
+   para los dos formatos. */
+function buildEmptyKnockout(format){
   const mk = (id)=>({id, homeName:null, awayName:null, hs:null, as:null});
-  return {
+  const base = {
     r16: [mk('P49'), mk('P50'), mk('P51'), mk('P52'), mk('P53'), mk('P54'), mk('P55'), mk('P56')],
     qf: [mk('QF1'), mk('QF2'), mk('QF3'), mk('QF4')],
     sf: [mk('SF1'), mk('SF2')],
     final: mk('FINAL'),
     bronze: mk('BRONZE'),
   };
+  if(format === 48){
+    base.r32 = Array.from({length:16}, (_,i)=> mk('T'+(i+1)));
+  }
+  return base;
 }
 
 let STATE = loadState();
@@ -264,8 +281,10 @@ function loadState(){
     const raw = localStorage.getItem('mundial2042_state_v1');
     if(raw){
       const parsed = JSON.parse(raw);
+      if(parsed.teamData && parsed.teamData.length) TEAM_DATA = parsed.teamData;
+      if(parsed.groupLetters && parsed.groupLetters.length) GROUP_LETTERS = parsed.groupLetters;
       // merge with defaults to survive schema changes
-      const base = defaultState();
+      const base = defaultState(parsed.format);
       return Object.assign(base, parsed, {matches: parsed.matches || base.matches, knockout: parsed.knockout || base.knockout});
     }
   }catch(e){ /* ignore */ }
@@ -316,7 +335,7 @@ function normalizeScores(state){
   });
   const K = state.knockout;
   if(K){
-    [...(K.r16||[]), ...(K.qf||[]), ...(K.sf||[]), K.final, K.bronze].filter(Boolean).forEach(m=>{
+    [...(K.r32||[]), ...(K.r16||[]), ...(K.qf||[]), ...(K.sf||[]), K.final, K.bronze].filter(Boolean).forEach(m=>{
       if(!hasScore(m.hs)) m.hs = null;
       if(!hasScore(m.as)) m.as = null;
     });
@@ -345,6 +364,9 @@ function initFirebaseSync(){
     applyingRemote = true;
     if(remote.matches) STATE.matches = remote.matches;
     if(remote.knockout) STATE.knockout = remote.knockout;
+    if(remote.teamData && remote.teamData.length){ TEAM_DATA = remote.teamData; STATE.teamData = remote.teamData; }
+    if(remote.groupLetters && remote.groupLetters.length){ GROUP_LETTERS = remote.groupLetters; STATE.groupLetters = remote.groupLetters; }
+    if(remote.format) STATE.format = remote.format;
     normalizeScores(STATE);
     autoFillKnockoutFromGroups();
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
@@ -370,7 +392,7 @@ function syncToFirebase(){
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
-    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout }).then(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32 }).then(()=>{
       pendingPush = false;
     }).catch(()=>{
       setLiveStatus(false, 'Error de sync');
@@ -411,7 +433,7 @@ function bumpMsgCount(){ localStorage.setItem('mundial2042_msgcount', String(get
 
 function allKnockoutMatches(){
   const K = STATE.knockout;
-  return [...K.r16, ...K.qf, ...K.sf, K.final, K.bronze];
+  return [...(K.r32||[]), ...K.r16, ...K.qf, ...K.sf, K.final, K.bronze];
 }
 
 function correctPredictionsCount(){
@@ -1386,6 +1408,7 @@ function renderCuadro(){
     </div>
     <div class="bracket-wrap">
       <div class="bracket">
+        ${K.r32 ? col('Dieciseisavos', K.r32.slice(0,8)) : ''}
         ${col('Ronda de 16 · P49-P52', [K.r16[0],K.r16[1],K.r16[2],K.r16[3]])}
         ${col('Cuartos', [K.qf[0],K.qf[1]])}
         <div class="bracket-col">
@@ -1413,6 +1436,7 @@ function renderCuadro(){
         </div>
         ${col('Cuartos', [K.qf[2],K.qf[3]])}
         ${col('Ronda de 16 · P53-P56', [K.r16[4],K.r16[5],K.r16[6],K.r16[7]])}
+        ${K.r32 ? col('Dieciseisavos', K.r32.slice(8,16)) : ''}
       </div>
     </div>
     <p style="padding:0 20px 20px;color:var(--muted);font-size:12px;">Todo en ??? hasta terminar grupos · Estilo oficial Hielo Eterno.</p>
@@ -1444,7 +1468,7 @@ function attachCuadroEvents(){
   const resetBtn = document.getElementById('resetBracket');
   if(resetBtn) resetBtn.addEventListener('click', ()=>{
     if(confirm('¿Vaciar todo el cuadro de eliminación?')){
-      STATE.knockout = buildEmptyKnockout();
+      STATE.knockout = buildEmptyKnockout(STATE.format||32);
       saveTournament(); render();
     }
   });
@@ -1452,7 +1476,7 @@ function attachCuadroEvents(){
 
 function findKnockoutMatch(id){
   const K = STATE.knockout;
-  return [...K.r16, ...K.qf, ...K.sf, K.final, K.bronze].find(m=>m.id===id);
+  return [...(K.r32||[]), ...K.r16, ...K.qf, ...K.sf, K.final, K.bronze].find(m=>m.id===id);
 }
 
 function matchWinner(m){
@@ -1472,6 +1496,13 @@ function matchLoser(m){
 
 function propagateBracket(){
   const K = STATE.knockout;
+  // dieciseisavos (r32) -> r16, solo en formato 48
+  if(K.r32){
+    for(let i=0;i<8;i++){
+      K.r16[i].homeName = matchWinner(K.r32[i*2]);
+      K.r16[i].awayName = matchWinner(K.r32[i*2+1]);
+    }
+  }
   // r16 -> qf  (P49+P50 -> QF1, P51+P52 -> QF2, P53+P54 -> QF3, P55+P56 -> QF4)
   const pairs = [[0,1,0],[2,3,1],[4,5,2],[6,7,3]];
   pairs.forEach(([a,b,qi])=>{
@@ -1495,6 +1526,7 @@ function propagateBracket(){
    100% de partidos jugados, sin esperar a que el admin apriete
    "Generar cuadro desde grupos" ni a que terminen todos los grupos. */
 function autoFillKnockoutFromGroups(){
+  if(STATE.format === 48){ autoFillKnockoutFromGroups48(); return; }
   const K = STATE.knockout;
   let changed = false;
   const assign = (slotIdx, side, group, which)=>{
@@ -1512,6 +1544,19 @@ function autoFillKnockoutFromGroups(){
   assign(6,'homeName','F','winner'); assign(6,'awayName','E','runnerup');
   assign(7,'homeName','H','winner'); assign(7,'awayName','G','runnerup');
   if(changed){ propagateBracket(); saveTournament(); }
+}
+
+/* En 48 no se puede rellenar grupo por grupo como en 32 (los 8 mejores
+   terceros dependen de que TODOS los grupos hayan terminado), así que
+   esto espera a que allGroupsComplete() sea true, y solo corre una vez
+   (si ya hay algo cargado en r32 no lo vuelve a sortear). */
+function autoFillKnockoutFromGroups48(){
+  if(!allGroupsComplete()) return;
+  const K = STATE.knockout;
+  if(!K.r32) return;
+  const alreadyFilled = K.r32.some(m=> m.homeName || m.awayName);
+  if(alreadyFilled) return;
+  generateBracketFromGroups48();
 }
 
 function checkChampionCelebration(){
@@ -1538,14 +1583,71 @@ function fireConfetti(){
   confetti({ particleCount: 120, spread: 100, origin:{y:0.5}, colors, startVelocity: 45 });
 }
 
+function teamGroupOf(code){ const t = TEAM_DATA.find(x=>x.code===code); return t ? t.group : null; }
+
+/* Ranking de terceros para elegir los 8 mejores (formato oficial 2026):
+   puntos, luego diferencia de gol, luego goles a favor. */
+function computeThirdPlaceRanking(){
+  return GROUP_LETTERS
+    .map(g=>({group:g, team: computeStandings(g)[2]}))
+    .filter(x=>x.team)
+    .sort((a,b)=>{
+      if(b.team.pts!==a.team.pts) return b.team.pts-a.team.pts;
+      const dgA=a.team.gf-a.team.gc, dgB=b.team.gf-b.team.gc;
+      if(dgB!==dgA) return dgB-dgA;
+      return b.team.gf-a.team.gf;
+    });
+}
+
+/* Evita, en la medida de lo posible, que dos equipos del mismo grupo se
+   crucen ya en dieciseisavos. No es un sorteo oficial FIFA (esa tabla de
+   cruces es enorme), es un sorteo al azar con esa única restricción. */
+function avoidSameGroupPairs(list){
+  const arr = list.slice();
+  for(let i=0; i<arr.length; i+=2){
+    let guard = 0;
+    while(guard < 20 && teamGroupOf(arr[i]) === teamGroupOf(arr[i+1])){
+      const j = Math.floor(Math.random()*arr.length);
+      if(j!==i+1 && j!==i){ [arr[i+1], arr[j]] = [arr[j], arr[i+1]]; }
+      guard++;
+    }
+  }
+  return arr;
+}
+
+function generateBracketFromGroups48(){
+  const winners = [], runnersup = [];
+  GROUP_LETTERS.forEach(g=>{
+    const st = computeStandings(g);
+    winners.push(st[0].code);
+    runnersup.push(st[1].code);
+  });
+  const bestThirds = computeThirdPlaceRanking().slice(0,8).map(x=>x.team.code);
+
+  const qualifiers = avoidSameGroupPairs(shuffleArray([...winners, ...runnersup, ...bestThirds]));
+  const K = buildEmptyKnockout(48);
+  for(let i=0;i<16;i++){
+    K.r32[i].homeName = qualifiers[i*2];
+    K.r32[i].awayName = qualifiers[i*2+1];
+  }
+  STATE.knockout = K;
+  propagateBracket();
+  saveTournament();
+  render();
+  if(!allGroupsComplete()){
+    alert('Nota: algunos grupos aún no terminaron. El cuadro se armó con las posiciones actuales (incluyendo terceros) y puede cambiar.');
+  }
+}
+
 function generateBracketFromGroups(){
+  if(STATE.format === 48){ generateBracketFromGroups48(); return; }
   const winners = {}, runnersup = {};
   GROUP_LETTERS.forEach(g=>{
     const st = computeStandings(g);
     winners[g] = st[0].code;
     runnersup[g] = st[1].code;
   });
-  const K = buildEmptyKnockout();
+  const K = buildEmptyKnockout(32);
   // Left side: groups A B C D
   K.r16[0].homeName = winners['A']; K.r16[0].awayName = runnersup['B']; // P49
   K.r16[1].homeName = winners['C']; K.r16[1].awayName = runnersup['D']; // P50
@@ -2354,9 +2456,13 @@ function attachAdminEvents(){
   if(genBtn) genBtn.addEventListener('click', generateBracketFromGroups);
   const resetBtn = document.getElementById('adminReset');
   if(resetBtn) resetBtn.addEventListener('click', ()=>{
-    if(confirm('¿Seguro que querés reiniciar TODO el torneo? Esta acción no se puede deshacer.')){
+    if(confirm('¿Seguro que querés reiniciar TODO el torneo? Esta acción no se puede deshacer y vuelve al torneo original de 32 selecciones.')){
+      TEAM_DATA = ORIGINAL_TEAM_DATA.slice();
+      GROUP_LETTERS = ORIGINAL_GROUP_LETTERS.slice();
       const kept = {profile: STATE.profile, settings: STATE.settings, admin: STATE.admin};
-      STATE = Object.assign(defaultState(), kept);
+      STATE = Object.assign(defaultState(32), kept);
+      STATE.teamData = TEAM_DATA;
+      STATE.groupLetters = GROUP_LETTERS;
       saveTournament(); render();
     }
   });
@@ -2648,10 +2754,112 @@ function saveNewTournamentDraft(){
   if(teams.length !== format){ alert(`Elegí exactamente ${format} países.`); return; }
   if(hosts.some(h=> !teams.includes(h))){ alert('Las sedes tienen que estar también tildadas en la lista de países participantes.'); return; }
 
-  STATE.newTournamentDraft = { format, hosts, teams, createdAt: Date.now() };
-  saveTournament();
+  const draft = { format, hosts, teams };
   document.getElementById('newTournamentModal').classList.remove('open');
-  alert('Configuración guardada ✅. En la próxima etapa vamos a usar esto para armar los grupos (con la/s sede/s fija/s en el Grupo A) y el cuadro de eliminación de ' + format + ' selecciones.');
+  openSorteoModal(draft);
+}
+
+/* ---------------- Sorteo animado ---------------- */
+
+/* Arma la asignación final de grupos: la/s sede/s van todas juntas al
+   Grupo A (más otros equipos al azar hasta completar 4), el resto se
+   reparte al azar en el resto de los grupos. */
+function drawGroupAssignment(draft){
+  const numGroups = draft.format / 4;
+  const letters = GROUP_LETTERS_FOR(numGroups);
+  const pool = shuffleArray(draft.teams.filter(c=> !draft.hosts.includes(c)));
+
+  const groups = {};
+  groups[letters[0]] = [...draft.hosts, ...pool.splice(0, 4 - draft.hosts.length)];
+  for(let i=1;i<numGroups;i++){ groups[letters[i]] = pool.splice(0,4); }
+
+  const assignment = [];
+  letters.forEach(letter=>{
+    groups[letter].forEach(code=>{
+      const country = COUNTRY_DB.find(c=>c.code===code);
+      assignment.push({code, name:country.name, iso:country.iso, group:letter});
+    });
+  });
+  return assignment;
+}
+
+function openSorteoModal(draft){
+  const assignment = drawGroupAssignment(draft);
+  const letters = GROUP_LETTERS_FOR(draft.format/4);
+  const grid = document.getElementById('sorteoGrid');
+
+  grid.innerHTML = letters.map(letter=>`
+    <div class="sorteo-group">
+      <div class="sorteo-group-label">GRUPO ${letter}</div>
+      <div class="sorteo-slots" id="sorteoSlots-${letter}">
+        ${[0,1,2,3].map(()=>`<div class="sorteo-slot"></div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('sorteoStatus').textContent = 'Sorteando…';
+  document.getElementById('sorteoConfirmBtn').style.display = 'none';
+  document.getElementById('sorteoModal').classList.add('open');
+
+  const order = [];
+  letters.forEach(letter=> assignment.filter(a=>a.group===letter).forEach(a=> order.push(a)));
+
+  let i = 0;
+  const counters = {};
+  const timer = setInterval(()=>{
+    if(i >= order.length){
+      clearInterval(timer);
+      document.getElementById('sorteoStatus').textContent = '¡Sorteo terminado!';
+      document.getElementById('sorteoConfirmBtn').style.display = 'block';
+      return;
+    }
+    const a = order[i];
+    const slotIdx = counters[a.group] || 0;
+    counters[a.group] = slotIdx + 1;
+    const slots = document.querySelectorAll(`#sorteoSlots-${a.group} .sorteo-slot`);
+    const slotEl = slots[slotIdx];
+    if(slotEl){
+      slotEl.innerHTML = `${flagImgIso(a.iso,'w40',a.name)}<span>${a.name}</span>`;
+      slotEl.classList.add('filled');
+    }
+    i++;
+  }, 220);
+
+  document.getElementById('sorteoConfirmBtn').onclick = ()=>{
+    document.getElementById('sorteoModal').classList.remove('open');
+    startTournamentFromDraft(draft, assignment);
+  };
+}
+
+/* Confirma el sorteo: reemplaza el roster (TEAM_DATA/GROUP_LETTERS), arma
+   los partidos de fase de grupos y un cuadro de eliminación vacío del
+   formato elegido, y lo sincroniza para todos los que estén mirando. */
+function startTournamentFromDraft(draft, assignment){
+  TEAM_DATA = assignment.map(a=>({code:a.code, name:a.name, flag:'', group:a.group}));
+  GROUP_LETTERS = GROUP_LETTERS_FOR(draft.format/4);
+
+  const matches = [];
+  GROUP_LETTERS.forEach(g=>{
+    const teams = TEAM_DATA.filter(t=>t.group===g).map(t=>t.code);
+    for(let i=0;i<teams.length;i++){
+      for(let j=i+1;j<teams.length;j++){
+        matches.push({id:`${teams[i]}-${teams[j]}`, group:g, home:teams[i], away:teams[j], hs:null, as:null});
+      }
+    }
+  });
+
+  STATE.format = draft.format;
+  STATE.teamData = TEAM_DATA;
+  STATE.groupLetters = GROUP_LETTERS;
+  STATE.matches = matches;
+  STATE.knockout = buildEmptyKnockout(draft.format);
+  STATE.awards = {fairplay:'', goleador:''};
+  STATE._celebrated = false;
+  STATE.newTournamentDraft = null;
+  STATE.view = 'grupos';
+  saveTournament();
+  setView('grupos');
+  alert(`¡Arrancó el Mundial de ${draft.format} selecciones! 🏆 Ya podés cargar resultados en Fase de Grupos.`);
 }
 
 function attachNewTournamentEvents(){
