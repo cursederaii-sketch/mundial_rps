@@ -244,6 +244,38 @@
   </div>
 </div>
 
+<!-- NEW TOURNAMENT MODAL -->
+<div class="modal-overlay" id="newTournamentModal">
+  <div class="modal" style="max-width:640px;">
+    <button class="modal-close" id="closeNewTournamentModal">✕</button>
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="mini-label">NUEVO TORNEO</div>
+
+      <div class="field">
+        <label class="mini-label">Formato</label>
+        <select id="ntFormat">
+          <option value="32">32 selecciones (8 grupos de 4)</option>
+          <option value="48" selected>48 selecciones (12 grupos de 4)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Sede/s (elegí entre 1 y 3)</label>
+        <div id="ntHostPicker" class="group-member-picker" style="max-height:160px;"></div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Países participantes</label>
+        <div id="ntTeamPicker" class="group-member-picker" style="max-height:320px;"></div>
+      </div>
+
+      <div class="hint" id="ntSummary" style="margin:12px 0;"></div>
+
+      <button class="btn-primary full" id="ntCreateBtn" disabled>Guardar configuración</button>
+    </div>
+  </div>
+</div>
+
 <!-- CHAT FAB -->
 <button class="chat-fab" id="chatFab" title="Chat">
   <img src="chat-icon.png" alt="Chat" class="chat-fab-img">

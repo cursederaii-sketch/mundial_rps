@@ -91,6 +91,101 @@ const TEAM_DATA = [
 
 const GROUP_LETTERS = ['A','B','C','D','E','F','G','H'];
 
+/* ---------------- Etapa 1: base de países para "Nuevo Torneo" ---------------- */
+const COUNTRY_DB = [
+  // UEFA
+  {code:'FRA', name:'Francia', iso:'fr', conf:'UEFA'},
+  {code:'ESP', name:'España', iso:'es', conf:'UEFA'},
+  {code:'ING', name:'Inglaterra', iso:'gb-eng', conf:'UEFA'},
+  {code:'ALE', name:'Alemania', iso:'de', conf:'UEFA'},
+  {code:'ITA', name:'Italia', iso:'it', conf:'UEFA'},
+  {code:'POR', name:'Portugal', iso:'pt', conf:'UEFA'},
+  {code:'NED', name:'Países Bajos', iso:'nl', conf:'UEFA'},
+  {code:'BEL', name:'Bélgica', iso:'be', conf:'UEFA'},
+  {code:'CRO', name:'Croacia', iso:'hr', conf:'UEFA'},
+  {code:'DIN', name:'Dinamarca', iso:'dk', conf:'UEFA'},
+  {code:'SUI', name:'Suiza', iso:'ch', conf:'UEFA'},
+  {code:'SRB', name:'Serbia', iso:'rs', conf:'UEFA'},
+  {code:'TUR', name:'Turquía', iso:'tr', conf:'UEFA'},
+  {code:'AUT', name:'Austria', iso:'at', conf:'UEFA'},
+  {code:'SWE', name:'Suecia', iso:'se', conf:'UEFA'},
+  {code:'GEO', name:'Georgia', iso:'ge', conf:'UEFA'},
+  {code:'POL', name:'Polonia', iso:'pl', conf:'UEFA'},
+  {code:'UKR', name:'Ucrania', iso:'ua', conf:'UEFA'},
+  {code:'WAL', name:'Gales', iso:'gb-wls', conf:'UEFA'},
+  {code:'SCO', name:'Escocia', iso:'gb-sct', conf:'UEFA'},
+  {code:'IRL', name:'Irlanda', iso:'ie', conf:'UEFA'},
+  {code:'NOR', name:'Noruega', iso:'no', conf:'UEFA'},
+  {code:'BIH', name:'Bosnia y Herzegovina', iso:'ba', conf:'UEFA'},
+  {code:'CZE', name:'Chequia', iso:'cz', conf:'UEFA'},
+  {code:'HUN', name:'Hungría', iso:'hu', conf:'UEFA'},
+  {code:'GRE', name:'Grecia', iso:'gr', conf:'UEFA'},
+  {code:'SVK', name:'Eslovaquia', iso:'sk', conf:'UEFA'},
+  {code:'ROU', name:'Rumania', iso:'ro', conf:'UEFA'},
+  // CONMEBOL
+  {code:'ARG', name:'Argentina', iso:'ar', conf:'CONMEBOL'},
+  {code:'BRA', name:'Brasil', iso:'br', conf:'CONMEBOL'},
+  {code:'URU', name:'Uruguay', iso:'uy', conf:'CONMEBOL'},
+  {code:'COL', name:'Colombia', iso:'co', conf:'CONMEBOL'},
+  {code:'ECU', name:'Ecuador', iso:'ec', conf:'CONMEBOL'},
+  {code:'PER', name:'Perú', iso:'pe', conf:'CONMEBOL'},
+  {code:'CHI', name:'Chile', iso:'cl', conf:'CONMEBOL'},
+  {code:'PAR', name:'Paraguay', iso:'py', conf:'CONMEBOL'},
+  {code:'BOL', name:'Bolivia', iso:'bo', conf:'CONMEBOL'},
+  {code:'VEN', name:'Venezuela', iso:'ve', conf:'CONMEBOL'},
+  // CAF
+  {code:'MAR', name:'Marruecos', iso:'ma', conf:'CAF'},
+  {code:'SEN', name:'Senegal', iso:'sn', conf:'CAF'},
+  {code:'NGA', name:'Nigeria', iso:'ng', conf:'CAF'},
+  {code:'EGI', name:'Egipto', iso:'eg', conf:'CAF'},
+  {code:'ALG', name:'Argelia', iso:'dz', conf:'CAF'},
+  {code:'CIV', name:'Costa de Marfil', iso:'ci', conf:'CAF'},
+  {code:'CMR', name:'Camerún', iso:'cm', conf:'CAF'},
+  {code:'GHA', name:'Ghana', iso:'gh', conf:'CAF'},
+  {code:'RSA', name:'Sudáfrica', iso:'za', conf:'CAF'},
+  {code:'CAB', name:'Cabo Verde', iso:'cv', conf:'CAF'},
+  {code:'TUN', name:'Túnez', iso:'tn', conf:'CAF'},
+  {code:'MLI', name:'Mali', iso:'ml', conf:'CAF'},
+  {code:'ZAM', name:'Zambia', iso:'zm', conf:'CAF'},
+  {code:'CON', name:'Congo', iso:'cd', conf:'CAF'},
+  {code:'ANG', name:'Angola', iso:'ao', conf:'CAF'},
+  // AFC
+  {code:'JAP', name:'Japón', iso:'jp', conf:'AFC'},
+  {code:'KOR', name:'Corea del Sur', iso:'kr', conf:'AFC'},
+  {code:'IRN', name:'Irán', iso:'ir', conf:'AFC'},
+  {code:'AUS', name:'Australia', iso:'au', conf:'AFC'},
+  {code:'KSA', name:'Arabia Saudita', iso:'sa', conf:'AFC'},
+  {code:'UZB', name:'Uzbekistán', iso:'uz', conf:'AFC'},
+  {code:'QAT', name:'Catar', iso:'qa', conf:'AFC'},
+  {code:'IRQ', name:'Irak', iso:'iq', conf:'AFC'},
+  {code:'UAE', name:'Emiratos Árabes Unidos', iso:'ae', conf:'AFC'},
+  {code:'JOR', name:'Jordania', iso:'jo', conf:'AFC'},
+  {code:'CHN', name:'China', iso:'cn', conf:'AFC'},
+  {code:'IND', name:'India', iso:'in', conf:'AFC'},
+  {code:'VGB', name:'Islas Vírgenes Británicas', iso:'vg', conf:'AFC'},
+  // CONCACAF
+  {code:'MEX', name:'México', iso:'mx', conf:'CONCACAF'},
+  {code:'EEU', name:'Estados Unidos', iso:'us', conf:'CONCACAF'},
+  {code:'CAN', name:'Canadá', iso:'ca', conf:'CONCACAF'},
+  {code:'CRC', name:'Costa Rica', iso:'cr', conf:'CONCACAF'},
+  {code:'JAM', name:'Jamaica', iso:'jm', conf:'CONCACAF'},
+  {code:'PAN', name:'Panamá', iso:'pa', conf:'CONCACAF'},
+  {code:'TRI', name:'Trinidad y Tobago', iso:'tt', conf:'CONCACAF'},
+  {code:'HAI', name:'Haití', iso:'ht', conf:'CONCACAF'},
+  {code:'HON', name:'Honduras', iso:'hn', conf:'CONCACAF'},
+  {code:'SLV', name:'El Salvador', iso:'sv', conf:'CONCACAF'},
+  {code:'GUA', name:'Guatemala', iso:'gt', conf:'CONCACAF'},
+  // OFC
+  {code:'NZL', name:'Nueva Zelanda', iso:'nz', conf:'OFC'},
+  {code:'FIJ', name:'Fiyi', iso:'fj', conf:'OFC'},
+  {code:'PNG', name:'Papúa Nueva Guinea', iso:'pg', conf:'OFC'},
+  {code:'SOL', name:'Islas Salomón', iso:'sb', conf:'OFC'},
+];
+
+function confLabel(conf){
+  return {UEFA:'🇪🇺 UEFA', CONMEBOL:'🌎 CONMEBOL', CAF:'🌍 CAF', AFC:'🌏 AFC', CONCACAF:'🌎 CONCACAF', OFC:'🌊 OFC'}[conf] || conf;
+}
+
 const HISTORY = [
   {year:2022, champion:'Colombia', runnerUp:'Francia', finalScore:[2,0], third:'Croacia', fourth:'Marruecos', thirdScore:[2,1], balon:null, goleador:null, fairplay:null},
   {year:2026, champion:'España', runnerUp:'Francia', finalScore:[2,0], third:'Holanda', fourth:'Paraguay', thirdScore:[3,1], balon:null, goleador:null, fairplay:null,
@@ -2203,6 +2298,11 @@ function renderAdmin(){
   <h1 class="page-title">Admin / TV <span class="badge on">Edición desbloqueada</span></h1>
   <div class="admin-panel">
     <div class="admin-box">
+      <h3>Nuevo torneo</h3>
+      <p>Elegí el formato (32 o 48 selecciones), la/s sede/s (1 a 3 países) y qué países participan, por confederación.</p>
+      <button class="btn-primary" id="adminNewTournament">Configurar nuevo torneo</button>
+    </div>
+    <div class="admin-box">
       <h3>Generar cuadro</h3>
       <p>Arma automáticamente la ronda de 16 usando los 2 primeros de cada grupo.</p>
       <button class="btn-primary" id="adminGen">Generar cuadro desde grupos</button>
@@ -2248,6 +2348,8 @@ function attachAdminEvents(){
     unlockBtn.addEventListener('click', tryUnlock);
     document.getElementById('adminKeyInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
   }
+  const newTournamentBtn = document.getElementById('adminNewTournament');
+  if(newTournamentBtn) newTournamentBtn.addEventListener('click', openNewTournamentModal);
   const genBtn = document.getElementById('adminGen');
   if(genBtn) genBtn.addEventListener('click', generateBracketFromGroups);
   const resetBtn = document.getElementById('adminReset');
@@ -2483,6 +2585,83 @@ document.querySelectorAll('.nav-item, .bn-item').forEach(btn=>{
 });
 
 /* ---------------- Init ---------------- */
+function init(){/* ---------------- Etapa 1: modal "Nuevo Torneo" ---------------- */
+function openNewTournamentModal(){
+  renderNewTournamentPicker();
+  document.getElementById('newTournamentModal').classList.add('open');
+}
+
+function renderNewTournamentPicker(){
+  const hostList = document.getElementById('ntHostPicker');
+  const teamList = document.getElementById('ntTeamPicker');
+  const prevHosts = ntSelectedHosts();
+  const prevTeams = ntSelectedTeams();
+
+  hostList.innerHTML = COUNTRY_DB.map(c=>`
+    <label class="group-member-row">
+      <input type="checkbox" class="nt-host-cb" value="${c.code}" ${prevHosts.includes(c.code)?'checked':''}>
+      ${flagImgIso(c.iso,'w40',c.name)}
+      <span>${c.name}</span>
+    </label>
+  `).join('');
+
+  const byConf = {};
+  COUNTRY_DB.forEach(c=>{ (byConf[c.conf] = byConf[c.conf]||[]).push(c); });
+  teamList.innerHTML = Object.keys(byConf).map(conf=>`
+    <div class="mini-label" style="margin-top:12px;">${confLabel(conf)}</div>
+    ${byConf[conf].map(c=>`
+      <label class="group-member-row">
+        <input type="checkbox" class="nt-team-cb" value="${c.code}" ${prevTeams.includes(c.code)?'checked':''}>
+        ${flagImgIso(c.iso,'w40',c.name)}
+        <span>${c.name}</span>
+      </label>
+    `).join('')}
+  `).join('');
+
+  updateNtSummary();
+}
+
+function ntSelectedHosts(){ return Array.from(document.querySelectorAll('.nt-host-cb:checked')).map(c=>c.value); }
+function ntSelectedTeams(){ return Array.from(document.querySelectorAll('.nt-team-cb:checked')).map(c=>c.value); }
+
+function updateNtSummary(){
+  const format = Number(document.getElementById('ntFormat').value);
+  const hosts = ntSelectedHosts();
+  const teams = ntSelectedTeams();
+  const okHosts = hosts.length>=1 && hosts.length<=3;
+  const okTeams = teams.length === format;
+  const hostsNotInTeams = hosts.filter(h=> !teams.includes(h));
+  const summary = document.getElementById('ntSummary');
+  summary.innerHTML = `
+    Sedes elegidas: <b>${hosts.length}</b> (mín 1, máx 3) ${okHosts?'✅':'⚠️'}<br>
+    Países elegidos: <b>${teams.length}</b> / ${format} ${okTeams?'✅':'⚠️'}
+    ${hostsNotInTeams.length? '<br><span style="color:var(--danger)">⚠️ Las sedes también tienen que estar tildadas en la lista de países.</span>' : ''}
+  `;
+  document.getElementById('ntCreateBtn').disabled = !(okHosts && okTeams && hostsNotInTeams.length===0);
+}
+
+function saveNewTournamentDraft(){
+  const format = Number(document.getElementById('ntFormat').value);
+  const hosts = ntSelectedHosts();
+  const teams = ntSelectedTeams();
+  if(!(hosts.length>=1 && hosts.length<=3)){ alert('Elegí entre 1 y 3 sedes.'); return; }
+  if(teams.length !== format){ alert(`Elegí exactamente ${format} países.`); return; }
+  if(hosts.some(h=> !teams.includes(h))){ alert('Las sedes tienen que estar también tildadas en la lista de países participantes.'); return; }
+
+  STATE.newTournamentDraft = { format, hosts, teams, createdAt: Date.now() };
+  saveTournament();
+  document.getElementById('newTournamentModal').classList.remove('open');
+  alert('Configuración guardada ✅. En la próxima etapa vamos a usar esto para armar los grupos (con la/s sede/s fija/s en el Grupo A) y el cuadro de eliminación de ' + format + ' selecciones.');
+}
+
+function attachNewTournamentEvents(){
+  document.getElementById('ntFormat').addEventListener('change', renderNewTournamentPicker);
+  document.getElementById('ntHostPicker').addEventListener('change', updateNtSummary);
+  document.getElementById('ntTeamPicker').addEventListener('change', updateNtSummary);
+  document.getElementById('closeNewTournamentModal').addEventListener('click', ()=> document.getElementById('newTournamentModal').classList.remove('open'));
+  document.getElementById('ntCreateBtn').addEventListener('click', saveNewTournamentDraft);
+}
+
 function init(){
   document.documentElement.style.setProperty('--grad1', STATE.settings.grad1);
   document.documentElement.style.setProperty('--grad2', STATE.settings.grad2);
@@ -2491,9 +2670,10 @@ function init(){
   document.getElementById('btnDesktop').classList.toggle('active', STATE.settings.device==='desktop');
   applyAvatar();
   bindProfileLiveUpdate();
+  attachNewTournamentEvents();
   render();
   initFirebaseSync();
   initSocial();
 }
 
-init();
+init();}
