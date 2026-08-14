@@ -278,6 +278,30 @@ function defaultBranding(){
   };
 }
 
+/* Música oficial del Mundial: un link de YouTube que carga el admin desde
+   Admin / TV. Se sincroniza en vivo por Firebase igual que branding, así
+   que el botón 🎵 de la topbar aparece para todos apenas se guarda. */
+function defaultMusic(){
+  return { youtubeUrl: null };
+}
+
+/* Acepta watch?v=, youtu.be/, embed/ y shorts/ y devuelve solo el ID del
+   video (o null si el link no es reconocible). */
+function extractYouTubeId(url){
+  if(!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=)([\w-]{11})/,
+    /(?:youtu\.be\/)([\w-]{11})/,
+    /(?:youtube\.com\/embed\/)([\w-]{11})/,
+    /(?:youtube\.com\/shorts\/)([\w-]{11})/,
+  ];
+  for(const re of patterns){
+    const m = url.match(re);
+    if(m) return m[1];
+  }
+  return null;
+}
+
 function defaultState(format){
   format = format || 32;
   const matches = [];
@@ -296,6 +320,7 @@ function defaultState(format){
     admin:{unlocked:false},
     awards:{fairplay:'', goleador:''},
     branding: defaultBranding(),
+    music: defaultMusic(),
     format,
     matches,
     knockout: buildEmptyKnockout(format),
@@ -389,6 +414,28 @@ function applyBranding(){
   if(aurora) aurora.style.backgroundImage = b.bgImage ? `url(${b.bgImage})` : '';
 }
 
+/* Muestra/oculta el botón 🎵 de la topbar según si el admin cargó un link
+   de YouTube válido. Si el panel de música está abierto y cambia (o se
+   borra) el link, actualiza el iframe / lo cierra en consecuencia. */
+function applyMusicButton(){
+  const btn = document.getElementById('btnMusic');
+  if(!btn) return;
+  const music = STATE.music || defaultMusic();
+  const id = extractYouTubeId(music.youtubeUrl);
+  btn.style.display = id ? '' : 'none';
+  if(!id){
+    document.getElementById('musicPanel').classList.remove('open');
+    document.getElementById('musicPanelBody').innerHTML = '';
+  }else if(document.getElementById('musicPanel').classList.contains('open')){
+    renderMusicPanelBody(id);
+  }
+}
+
+function renderMusicPanelBody(id){
+  document.getElementById('musicPanelBody').innerHTML =
+    `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1" title="Música del Mundial" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+}
+
 function setLiveStatus(on, label){
   const dot = document.getElementById('liveDot');
   const text = document.getElementById('liveText');
@@ -440,10 +487,12 @@ function initFirebaseSync(){
     if(remote.groupLetters && remote.groupLetters.length){ GROUP_LETTERS = remote.groupLetters; STATE.groupLetters = remote.groupLetters; }
     if(remote.format) STATE.format = remote.format;
     if(remote.branding) STATE.branding = remote.branding;
+    if(remote.music) STATE.music = remote.music;
     normalizeScores(STATE);
     autoFillKnockoutFromGroups();
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
     applyBranding();
+    applyMusicButton();
     render();
     applyingRemote = false;
   });
@@ -466,7 +515,7 @@ function syncToFirebase(){
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
-    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding() }).then(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding(), music: STATE.music||defaultMusic() }).then(()=>{
       pendingPush = false;
     }).catch(()=>{
       setLiveStatus(false, 'Error de sync');
@@ -2874,6 +2923,17 @@ function renderAdmin(){
     </div>
 
     <div class="admin-box">
+      <h3>Música del Mundial</h3>
+      <p>Pegá el link de YouTube del tema/himno de esta edición. Se guarda solo y aparece un botón 🎵 en la barra superior para todos, en vivo.</p>
+      <div class="field">
+        <label class="mini-label">Link de YouTube</label>
+        <input type="text" id="musicUrlInput" maxlength="200" value="${escapeHtml((STATE.music&&STATE.music.youtubeUrl)||'')}" placeholder="https://www.youtube.com/watch?v=...">
+      </div>
+      <div class="hint" id="musicUrlHint" style="margin-top:6px;"></div>
+      <button class="btn-mini-clear" id="musicUrlClearBtn" style="margin-top:10px;">Quitar música</button>
+    </div>
+
+    <div class="admin-box">
       <h3>Bloquear edición</h3>
       <p>Volver a Modo TV: solo lectura, sin poder tocar resultados.</p>
       <button class="btn-secondary" id="adminLock">Volver a Modo TV</button>
@@ -2920,6 +2980,39 @@ function attachAdminEvents(){
   if(lockBtn) lockBtn.addEventListener('click', ()=>{ STATE.admin.unlocked=false; saveState(); render(); });
 
   attachBrandingEvents();
+  attachMusicAdminEvents();
+}
+
+function attachMusicAdminEvents(){
+  const urlInput = document.getElementById('musicUrlInput');
+  const hint = document.getElementById('musicUrlHint');
+  if(!urlInput) return;
+
+  const updateHint = (id)=>{
+    if(!hint) return;
+    if(!urlInput.value.trim()) hint.textContent = '';
+    else hint.textContent = id ? '✓ Link válido' : 'No reconozco ese link de YouTube — probá copiarlo de nuevo.';
+  };
+  updateHint(extractYouTubeId(urlInput.value));
+
+  urlInput.addEventListener('input', ()=>{
+    if(!STATE.music) STATE.music = defaultMusic();
+    const val = urlInput.value.trim();
+    const id = extractYouTubeId(val);
+    STATE.music.youtubeUrl = val || null;
+    updateHint(id);
+    applyMusicButton();
+    saveTournament();
+  });
+
+  const clearBtn = document.getElementById('musicUrlClearBtn');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{
+    STATE.music = defaultMusic();
+    urlInput.value = '';
+    updateHint(null);
+    applyMusicButton();
+    saveTournament();
+  });
 }
 
 /* ---------------- Identidad del Mundial (branding) — eventos ---------------- */
@@ -3216,6 +3309,22 @@ document.getElementById('btnShare').addEventListener('click', async ()=>{
 
 document.getElementById('btnDownload').addEventListener('click', exportData);
 
+document.getElementById('btnMusic').addEventListener('click', ()=>{
+  const panel = document.getElementById('musicPanel');
+  const willOpen = !panel.classList.contains('open');
+  panel.classList.toggle('open', willOpen);
+  if(willOpen){
+    const id = extractYouTubeId((STATE.music||defaultMusic()).youtubeUrl);
+    if(id) renderMusicPanelBody(id);
+  }else{
+    document.getElementById('musicPanelBody').innerHTML = ''; // corta el audio al cerrar
+  }
+});
+document.getElementById('musicPanelClose').addEventListener('click', ()=>{
+  document.getElementById('musicPanel').classList.remove('open');
+  document.getElementById('musicPanelBody').innerHTML = '';
+});
+
 function flashButton(id, msg){
   const btn = document.getElementById(id);
   const original = btn.textContent;
@@ -3418,6 +3527,7 @@ function init(){
   document.getElementById('btnMobile').classList.toggle('active', STATE.settings.device==='mobile');
   document.getElementById('btnDesktop').classList.toggle('active', STATE.settings.device==='desktop');
   applyBranding();
+  applyMusicButton();
   applyAvatar();
   bindProfileLiveUpdate();
   attachNewTournamentEvents();
