@@ -2102,13 +2102,109 @@ function countryStats(name){
   };
 }
 
+/* ---------- Ranking IPFT por puntos (TODOS los países) ----------
+   Sistema de puntos propio de la app, pensado para recompensar tanto
+   los logros grandes (títulos, finales, semis) como la participación
+   sostenida (partidos jugados). Se recalcula en vivo con cada Mundial:
+   apenas HISTORY suma una edición archivada, o el torneo en curso
+   registra resultados, el ranking se actualiza solo.
+
+     🏆 Campeón            +100 pts
+     🥈 Subcampeón          +60 pts
+     🥉 Tercer puesto       +40 pts
+     4️⃣ Cuarto puesto       +20 pts
+     ⛸ Llegar a Octavos    +10 pts (por cada vez)
+     ⚽ Partido jugado       +2 pts (por cada partido, cualquier fase)
+
+   "Todos los países" = todo país que aparece en el roster del torneo
+   actual (TEAM_DATA), en la base de selecciones (COUNTRY_DB) o en
+   cualquier resultado histórico registrado — así ningún país queda
+   afuera del ranking, aunque tenga 0 puntos. */
+const IPFT_POINTS = { titulo:100, subcampeon:60, tercero:40, cuarto:20, octavos:10, partido:2 };
+
+function computeIpftRanking(){
+  const stats = {};
+  const ensure = (name)=>{
+    if(!name || name==='???') return null;
+    if(!stats[name]) stats[name] = {name, titles:0, subs:0, thirds:0, fourths:0, octavos:0, partidos:0};
+    return stats[name];
+  };
+
+  // Sembramos con todos los países conocidos por la app, aunque tengan 0 puntos.
+  TEAM_DATA.forEach(t=>ensure(t.name));
+  COUNTRY_DB.forEach(c=>ensure(c.name));
+
+  const all = allHallEntries();
+  all.forEach(h=>{
+    if(h.champion) ensure(h.champion).titles++;
+    if(h.runnerUp) ensure(h.runnerUp).subs++;
+    if(h.third) ensure(h.third).thirds++;
+    if(h.fourth) ensure(h.fourth).fourths++;
+
+    // La final y el tercer puesto suman como partido jugado para sus 4 protagonistas.
+    if(h.champion && h.runnerUp){ ensure(h.champion).partidos++; ensure(h.runnerUp).partidos++; }
+    if(h.third && h.fourth){ ensure(h.third).partidos++; ensure(h.fourth).partidos++; }
+
+    if(h.group && h.group.teams){
+      h.group.teams.forEach(t=>{ const s=ensure(t.name); if(s) s.partidos += Number(t.pj)||0; });
+    }
+    if(h.bracket){
+      Object.keys(h.bracket).forEach(roundKey=>{
+        (h.bracket[roundKey]||[]).forEach(([home,hs,away,as])=>{
+          const sh=ensure(home), sa=ensure(away);
+          if(sh) sh.partidos++;
+          if(sa) sa.partidos++;
+          if(roundKey==='r16'){ if(sh) sh.octavos++; if(sa) sa.octavos++; }
+        });
+      });
+    }
+  });
+
+  // Torneo en curso: solo si esa edición todavía no está archivada en HISTORY
+  // (evita sumar 2042 dos veces una vez que quede guardada a mano).
+  const current = currentChampionEntry();
+  const alreadyArchived = current && HISTORY.some(h=>h.year===current.year);
+  if(!alreadyArchived){
+    STATE.matches.forEach(m=>{
+      if(isPlayed(m)){
+        const sh=ensure(teamName(m.home)), sa=ensure(teamName(m.away));
+        if(sh) sh.partidos++;
+        if(sa) sa.partidos++;
+      }
+    });
+    const K = STATE.knockout;
+    const stagesList = [
+      ['r32', K.r32||[]], ['r16', K.r16||[]], ['qf', K.qf||[]], ['sf', K.sf||[]],
+      ['final', K.final?[K.final]:[]], ['bronze', K.bronze?[K.bronze]:[]],
+    ];
+    stagesList.forEach(([key, list])=>{
+      list.forEach(m=>{
+        if(m && m.homeName && m.awayName && isPlayed(m)){
+          const sh=ensure(teamName(m.homeName)), sa=ensure(teamName(m.awayName));
+          if(sh) sh.partidos++;
+          if(sa) sa.partidos++;
+          if(key==='r16'){ if(sh) sh.octavos++; if(sa) sa.octavos++; }
+        }
+      });
+    });
+  }
+
+  Object.values(stats).forEach(s=>{
+    s.points = s.titles*IPFT_POINTS.titulo + s.subs*IPFT_POINTS.subcampeon + s.thirds*IPFT_POINTS.tercero
+      + s.fourths*IPFT_POINTS.cuarto + s.octavos*IPFT_POINTS.octavos + s.partidos*IPFT_POINTS.partido;
+  });
+
+  return Object.values(stats).sort((a,b)=>
+    b.points-a.points || b.titles-a.titles || b.subs-a.subs || b.thirds-a.thirds || b.partidos-a.partidos || a.name.localeCompare(b.name));
+}
+
 /* Optional local photos: drop files into the paths below (inside the repo)
    and they'll appear automatically; until then a themed gradient shows instead. */
 function assetImg(src, alt, cls){
   return `<img src="${src}" alt="${alt}" class="${cls||''}" loading="lazy" onerror="this.classList.add('img-missing')">`;
 }
 
-let famaNav = {view:'ranking', country:null, year:null, tab:'grupos', search:''};
+let famaNav = {view:'ranking', country:null, year:null, tab:'grupos', search:'', h2hA:null, h2hB:null};
 
 function renderFama(){
   const current = currentChampionEntry();
@@ -2120,9 +2216,9 @@ function renderFama(){
   const subnav = `
   <div class="fama-topbar">
     <div class="fama-subnav">
-      ${['ranking','todos','stats','historia','acerca'].map(v=>`
+      ${['ranking','puntos','historial','todos','stats','historia','acerca'].map(v=>`
         <button class="fama-tab ${famaNav.view===v?'active':''}" data-famanav="${v}">${{
-          ranking:'Ranking', todos:'Todos los Mundiales', stats:'Estadísticas', historia:'Historia', acerca:'Acerca de'
+          ranking:'Ranking', puntos:'Ranking IPFT', historial:'Historial', todos:'Todos los Mundiales', stats:'Estadísticas', historia:'Historia', acerca:'Acerca de'
         }[v]}</button>`).join('')}
     </div>
     <div class="fama-search">
@@ -2133,6 +2229,8 @@ function renderFama(){
   let body = '';
   if(famaNav.view==='country' && famaNav.country) body = renderCountryDetail(famaNav.country, champions, all);
   else if(famaNav.view==='mundial' && famaNav.year) body = renderMundialDetail(famaNav.year, all);
+  else if(famaNav.view==='puntos') body = renderFamaPuntos();
+  else if(famaNav.view==='historial') body = renderFamaHistorial();
   else if(famaNav.view==='todos') body = renderFamaTodos(all);
   else if(famaNav.view==='stats') body = renderFamaStats(champions, all);
   else if(famaNav.view==='historia') body = renderFamaHistoria(all);
@@ -2180,6 +2278,120 @@ function renderFamaRanking(champions, current){
   <div class="rank-grid">${cards}</div>
   <div class="section-label">Tocá un país para ver su historia</div>
   <div class="country-grid">${gridCards}</div>
+  `;
+}
+
+function renderFamaPuntos(){
+  const ranking = computeIpftRanking();
+  const q = (famaNav.search||'').trim().toLowerCase();
+  const filtered = q ? ranking.filter(c=>c.name.toLowerCase().includes(q)) : ranking;
+
+  const rows = filtered.map((c,i)=>`
+    <tr class="clickable" data-country="${c.name}">
+      <td class="num">${ranking.indexOf(c)+1}</td>
+      <td class="team-cell"><span class="flag">${flagByCountryName(c.name,'w40')}</span>${c.name}</td>
+      <td class="num pts-cell">${c.points}</td>
+      <td class="num">${c.titles||''}</td>
+      <td class="num">${c.subs||''}</td>
+      <td class="num">${c.thirds||''}</td>
+      <td class="num">${c.octavos||''}</td>
+      <td class="num">${c.partidos||''}</td>
+    </tr>`).join('');
+
+  return `
+  <div class="panel ipft-legend-panel">
+    <div class="panel-title" style="margin-bottom:4px;">Ranking IPFT · Sistema de puntos</div>
+    <div class="ranking-sub" style="margin:0 0 14px;">Se actualiza solo con cada Mundial jugado — todos los países cuentan, aunque tengan 0 puntos</div>
+    <div class="ipft-points-legend">
+      <span>🏆 Campeón <b>+${IPFT_POINTS.titulo}</b></span>
+      <span>🥈 Subcampeón <b>+${IPFT_POINTS.subcampeon}</b></span>
+      <span>🥉 Tercer puesto <b>+${IPFT_POINTS.tercero}</b></span>
+      <span>4️⃣ Cuarto puesto <b>+${IPFT_POINTS.cuarto}</b></span>
+      <span>⛸ Llegar a Octavos <b>+${IPFT_POINTS.octavos}</b> c/u</span>
+      <span>⚽ Partido jugado <b>+${IPFT_POINTS.partido}</b> c/u</span>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Ranking IPFT · Todos los países</div></div>
+    <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>#</th><th>País</th><th class="num">Puntos</th><th class="num">🏆</th><th class="num">🥈</th><th class="num">🥉</th><th class="num">Octavos</th><th class="num">PJ</th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="8" class="empty-note">No se encontraron países.</td></tr>'}</tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+function renderFamaHistorial(){
+  const names = [...new Set([...TEAM_DATA.map(t=>t.name), ...COUNTRY_DB.map(c=>c.name)])].sort((a,b)=>a.localeCompare(b));
+  const a = (famaNav.h2hA && names.includes(famaNav.h2hA)) ? famaNav.h2hA : names[0];
+  let b = (famaNav.h2hB && names.includes(famaNav.h2hB)) ? famaNav.h2hB : names.find(n=>n!==a);
+  if(a===b) b = names.find(n=>n!==a);
+
+  const optsA = names.map(n=>`<option value="${escapeHtml(n)}" ${n===a?'selected':''}>${n}</option>`).join('');
+  const optsB = names.map(n=>`<option value="${escapeHtml(n)}" ${n===b?'selected':''}>${n}</option>`).join('');
+
+  let body;
+  if(!a || !b || a===b){
+    body = `<div class="empty-note">Elegí dos países distintos para ver su historial.</div>`;
+  } else {
+    const meets = getH2H(a, b);
+    if(!meets || !meets.length){
+      body = `<div class="empty-note">${a} y ${b} nunca se enfrentaron en un Mundial, según los datos registrados.</div>`;
+    } else {
+      let winsA=0, winsB=0, draws=0;
+      meets.forEach(m=>{
+        const aIsHome = m.home===a;
+        const sa = aIsHome ? m.hs : m.as, sb = aIsHome ? m.as : m.hs;
+        if(sa>sb) winsA++; else if(sb>sa) winsB++; else draws++;
+      });
+      const rows = meets.slice().reverse().map(m=>{
+        const aIsHome = m.home===a;
+        const sa = aIsHome ? m.hs : m.as, sb = aIsHome ? m.as : m.hs;
+        const cls = sa>sb ? 'h2h-win' : sa<sb ? 'h2h-lose' : 'h2h-draw';
+        return `<div class="h2h-match-row ${cls}">
+          <span class="h2h-year">${m.year}</span>
+          <span class="h2h-stage">${m.stage}</span>
+          <span class="h2h-score">${flagByCountryName(a,'w40')} <b>${sa} - ${sb}</b> ${flagByCountryName(b,'w40')}</span>
+        </div>`;
+      }).join('');
+      body = `
+      <div class="h2h-summary">
+        <div class="h2h-summary-team">
+          <div class="h2h-summary-flag">${flagByCountryName(a,'w80')}</div>
+          <div class="h2h-summary-name">${a}</div>
+          <div class="h2h-summary-wins">${winsA} victoria${winsA!==1?'s':''}</div>
+        </div>
+        <div class="h2h-summary-mid">
+          <div class="h2h-summary-count">${meets.length}</div>
+          <div class="h2h-summary-label">enfrentamiento${meets.length!==1?'s':''}</div>
+          <div class="h2h-summary-draws">${draws} empate${draws!==1?'s':''}</div>
+        </div>
+        <div class="h2h-summary-team">
+          <div class="h2h-summary-flag">${flagByCountryName(b,'w80')}</div>
+          <div class="h2h-summary-name">${b}</div>
+          <div class="h2h-summary-wins">${winsB} victoria${winsB!==1?'s':''}</div>
+        </div>
+      </div>
+      <div class="panel" style="padding:16px 20px;margin-top:16px;">
+        <div class="panel-title" style="margin-bottom:10px;">Historial completo</div>
+        ${rows}
+      </div>`;
+    }
+  }
+
+  return `
+  <div class="panel" style="padding:20px;margin-bottom:16px;">
+    <div class="panel-title" style="margin-bottom:12px;">Historial entre dos países</div>
+    <div class="h2h-picker-row">
+      <select id="h2hSelectA">${optsA}</select>
+      <span class="h2h-vs">VS</span>
+      <select id="h2hSelectB">${optsB}</select>
+    </div>
+  </div>
+  ${body}
   `;
 }
 
@@ -2424,6 +2636,11 @@ function attachFamaEvents(){
   content.querySelectorAll('[data-back]').forEach(el=>{
     el.addEventListener('click', ()=>{ famaNav.view=el.dataset.back; famaNav.country=null; famaNav.year=null; render(); });
   });
+
+  const h2hA = document.getElementById('h2hSelectA');
+  if(h2hA) h2hA.addEventListener('change', (e)=>{ famaNav.h2hA = e.target.value; render(); });
+  const h2hB = document.getElementById('h2hSelectB');
+  if(h2hB) h2hB.addEventListener('change', (e)=>{ famaNav.h2hB = e.target.value; render(); });
 }
 
 
