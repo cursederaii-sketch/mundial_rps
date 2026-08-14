@@ -275,6 +275,9 @@ function defaultBranding(){
     grad1: '#7c5cff',
     grad2: '#0a1931',
     bgImage: null,
+    heroPrefix: 'BIENVENIDO AL',
+    heroHighlight: 'HIELO ETERNO',
+    heroText: 'Mundial 2042 se juega en estadios climatizados bajo auroras. 32 naciones, -12°C, gloria infinita. Administra resultados, vive el cuadro, honra la historia.',
   };
 }
 
@@ -547,12 +550,27 @@ let FRIEND_COLORS = {};
 let MY_PREDICTIONS = {};
 let MY_GROUPS = {};
 let GROUP_INFO = {};
+let MY_MANUAL_ACHIEVEMENTS = [];
 let ACTIVE_CHAT_FRIEND = null;
 let ACTIVE_CHANNEL = {type:null, id:null};
 let chatMsgsRefOff = null;
 
 function getMsgCount(){ return Number(localStorage.getItem('mundial2042_msgcount')||0); }
 function bumpMsgCount(){ localStorage.setItem('mundial2042_msgcount', String(getMsgCount()+1)); }
+
+/* Rastrea qué secciones de la app visitó este DT (para el logro "Explorador
+   Polar"). Se guarda en este navegador, igual que el resto de contadores
+   locales usados por los logros. */
+function getVisitedViews(){
+  try{ return JSON.parse(localStorage.getItem('mundial2042_visited')||'[]'); }catch(e){ return []; }
+}
+function markViewVisited(view){
+  if(!view) return;
+  const set = new Set(getVisitedViews());
+  if(set.has(view)) return;
+  set.add(view);
+  try{ localStorage.setItem('mundial2042_visited', JSON.stringify([...set])); }catch(e){}
+}
 
 function allKnockoutMatches(){
   const K = STATE.knockout;
@@ -570,24 +588,38 @@ function correctPredictionsCount(){
 
 /* ---------------- Logros y rol ---------------- */
 const ACHIEVEMENTS = [
-  {id:'first_match', icon:'⚽', name:'Primer Partido', check:()=> playedCount()>=1},
-  {id:'groups_done', icon:'▤', name:'Grupos Completos', check:()=> allGroupsComplete()},
-  {id:'champion', icon:'🏆', name:'Campeón Coronado', check:()=> !!(STATE.knockout.final && hasScore(STATE.knockout.final.hs))},
-  {id:'social', icon:'🤝', name:'Sociable', check:()=> Object.keys(MY_FRIENDS).length>=1},
-  {id:'circle', icon:'❄', name:'Círculo de Hielo', check:()=> Object.keys(MY_FRIENDS).length>=5},
-  {id:'icebreaker', icon:'💬', name:'Rompehielos', check:()=> getMsgCount()>=1},
-  {id:'oracle', icon:'🔮', name:'Oráculo Polar', check:()=> correctPredictionsCount()>=1},
-  {id:'visionary', icon:'🌟', name:'Visionario', check:()=> correctPredictionsCount()>=5},
-  {id:'fanatic', icon:'🎖', name:'Fanático Total', check:()=> playedCount()>=STATE.matches.length && STATE.matches.length>0},
-  {id:'predictor_pro', icon:'📋', name:'Estratega Meticuloso', check:()=> Object.keys(MY_PREDICTIONS).length>=10},
-  {id:'perfectionist', icon:'🎯', name:'Predicción Perfecta', check:()=> correctPredictionsCount()>=10},
-  {id:'bracket_ready', icon:'🧊', name:'Cuadro en Marcha', check:()=> STATE.knockout.r16.every(m=>m.homeName && m.awayName)},
-  {id:'ten_friends', icon:'👥', name:'Círculo Ártico', check:()=> Object.keys(MY_FRIENDS).length>=10},
-  {id:'group_founder', icon:'🏕', name:'Fundador de Grupo', check:()=> Object.keys(MY_GROUPS).length>=1},
-  {id:'chatterbox', icon:'🗨', name:'Charlatán Polar', check:()=> getMsgCount()>=50},
+  {id:'first_match', icon:'⚽', name:'Primer Partido', desc:'Cargá el resultado de al menos 1 partido de la fase de grupos.', check:()=> playedCount()>=1},
+  {id:'groups_done', icon:'▤', name:'Grupos Completos', desc:'Completá los resultados de todos los partidos de la fase de grupos.', check:()=> allGroupsComplete()},
+  {id:'bracket_ready', icon:'🧊', name:'Cuadro en Marcha', desc:'Conseguí que los 8 partidos de la ronda de 16 tengan sus equipos definidos.', check:()=> STATE.knockout.r16.every(m=>m.homeName && m.awayName)},
+  {id:'quarterfinal_set', icon:'🥶', name:'Quedan los Duros', desc:'Se desbloquea cuando los 4 cuartos de final quedan armados, con sus equipos ya definidos.', check:()=> STATE.knockout.qf.every(m=>m.homeName && m.awayName)},
+  {id:'semifinal_set', icon:'🥈', name:'Choque de Titanes', desc:'Se desbloquea cuando las 2 semifinales quedan armadas, con los 4 mejores equipos confirmados.', check:()=> STATE.knockout.sf.every(m=>m.homeName && m.awayName)},
+  {id:'final_set', icon:'🎇', name:'La Gran Final', desc:'Se desbloquea cuando la final queda armada, con sus dos finalistas confirmados.', check:()=> !!(STATE.knockout.final && STATE.knockout.final.homeName && STATE.knockout.final.awayName)},
+  {id:'bronze_done', icon:'🥉', name:'El Tercer Puesto', desc:'Cargá el resultado del partido por el tercer puesto.', check:()=> !!(STATE.knockout.bronze && hasScore(STATE.knockout.bronze.hs))},
+  {id:'champion', icon:'🏆', name:'Campeón Coronado', desc:'Cargá el resultado de la final del torneo.', check:()=> !!(STATE.knockout.final && hasScore(STATE.knockout.final.hs))},
+  {id:'fanatic', icon:'🎖', name:'Fanático Total', desc:'Completá TODOS los partidos del torneo, incluida la fase de grupos y el cuadro de eliminación.', check:()=> playedCount()>=STATE.matches.length && STATE.matches.length>0},
+  {id:'social', icon:'🤝', name:'Sociable', desc:'Agregá a tu primer amigo con su código DT-XXXX.', check:()=> Object.keys(MY_FRIENDS).length>=1},
+  {id:'circle', icon:'❄', name:'Círculo de Hielo', desc:'Sumá 5 amigos en tu lista.', check:()=> Object.keys(MY_FRIENDS).length>=5},
+  {id:'ten_friends', icon:'👥', name:'Círculo Ártico', desc:'Sumá 10 amigos en tu lista.', check:()=> Object.keys(MY_FRIENDS).length>=10},
+  {id:'icebreaker', icon:'💬', name:'Rompehielos', desc:'Enviá tu primer mensaje de chat.', check:()=> getMsgCount()>=1},
+  {id:'chatterbox', icon:'🗨', name:'Charlatán Polar', desc:'Enviá 50 mensajes de chat.', check:()=> getMsgCount()>=50},
+  {id:'veteran', icon:'📡', name:'Veterano del Hielo', desc:'Enviá 200 mensajes de chat en total.', check:()=> getMsgCount()>=200},
+  {id:'group_founder', icon:'🏕', name:'Fundador de Grupo', desc:'Creá o sumate a tu primer grupo de chat.', check:()=> Object.keys(MY_GROUPS).length>=1},
+  {id:'crew', icon:'⛺', name:'Manada Polar', desc:'Formá parte de 3 grupos de chat distintos (creados por vos o a los que te sumaron).', check:()=> Object.keys(MY_GROUPS).length>=3},
+  {id:'first_prediction', icon:'📝', name:'Primera Apuesta', desc:'Cargá tu primera predicción de resultado, para cualquier partido.', check:()=> Object.keys(MY_PREDICTIONS).length>=1},
+  {id:'oracle', icon:'🔮', name:'Oráculo Polar', desc:'Acertá tu primera predicción de resultado.', check:()=> correctPredictionsCount()>=1},
+  {id:'visionary', icon:'🌟', name:'Visionario', desc:'Acertá 5 predicciones de resultado.', check:()=> correctPredictionsCount()>=5},
+  {id:'predictor_pro', icon:'📋', name:'Estratega Meticuloso', desc:'Cargá 10 predicciones de partidos, aunque todavía no se hayan jugado.', check:()=> Object.keys(MY_PREDICTIONS).length>=10},
+  {id:'perfectionist', icon:'🎯', name:'Predicción Perfecta', desc:'Acertá 10 predicciones de resultado exacto.', check:()=> correctPredictionsCount()>=10},
+  {id:'explorer', icon:'🧭', name:'Explorador Polar', desc:'Visitá las 6 secciones de la app al menos una vez: Inicio, Grupos, Cuadro, Salón Fama, Ajustes y Admin.', check:()=> getVisitedViews().length>=6},
 ];
 
-function computeAchievements(){ return ACHIEVEMENTS.map(a=>({...a, unlocked: !!a.check()})); }
+/* Los logros se pueden desbloquear cumpliendo la condición (check) o porque
+   un admin te lo entregó a mano desde Admin / TV (MY_MANUAL_ACHIEVEMENTS,
+   sincronizado por Firebase — ver initSocial y grantAchievement). */
+function computeAchievements(){
+  const manual = MY_MANUAL_ACHIEVEMENTS || [];
+  return ACHIEVEMENTS.map(a=>({...a, unlocked: !!a.check() || manual.includes(a.id)}));
+}
 
 function roleForCount(n){
   if(n>=13) return 'DT Supremo';
@@ -602,16 +634,32 @@ function renderAchievements(){
   if(!grid) return;
   const list = computeAchievements();
   grid.innerHTML = list.map(a=>`
-    <div class="achv-item ${a.unlocked?'unlocked':''}">
+    <div class="achv-item ${a.unlocked?'unlocked':''}" data-achv="${a.id}" title="Ver cómo conseguirlo">
       <span class="achv-icon">${a.icon}</span>
-      <span class="achv-name">${a.name}</span>
+      <span class="achv-name">${escapeHtml(a.name)}</span>
     </div>
   `).join('');
+  grid.querySelectorAll('.achv-item').forEach(el=> el.addEventListener('click', ()=> openAchvDetail(el.dataset.achv)));
   const unlocked = list.filter(a=>a.unlocked).length;
   const roleEl = document.getElementById('profileRoleBadge');
   if(roleEl) roleEl.textContent = roleForCount(unlocked);
   const tagEl = document.getElementById('profileTagValue');
   if(tagEl) tagEl.textContent = MY_TAG;
+}
+
+/* Muestra en un modal cómo se consigue un logro puntual (se abre al
+   clickear cualquier ícono de logro en el perfil). */
+function openAchvDetail(id){
+  const list = computeAchievements();
+  const a = list.find(x=>x.id===id);
+  if(!a) return;
+  document.getElementById('achvDetailIcon').textContent = a.icon;
+  document.getElementById('achvDetailName').textContent = a.name;
+  document.getElementById('achvDetailDesc').textContent = a.desc || '';
+  const statusEl = document.getElementById('achvDetailStatus');
+  statusEl.textContent = a.unlocked ? '✓ Desbloqueado' : '🔒 Bloqueado';
+  statusEl.classList.toggle('locked', !a.unlocked);
+  document.getElementById('achvDetailModal').classList.add('open');
 }
 
 /* ---------------- Amigos ---------------- */
@@ -669,6 +717,9 @@ function openFriendProfile(tag){
 }
 document.getElementById('closeFriendProfile').addEventListener('click', ()=> document.getElementById('friendProfileModal').classList.remove('open'));
 document.getElementById('friendProfileModal').addEventListener('click', (e)=>{ if(e.target.id==='friendProfileModal') document.getElementById('friendProfileModal').classList.remove('open'); });
+
+document.getElementById('closeAchvDetail').addEventListener('click', ()=> document.getElementById('achvDetailModal').classList.remove('open'));
+document.getElementById('achvDetailModal').addEventListener('click', (e)=>{ if(e.target.id==='achvDetailModal') document.getElementById('achvDetailModal').classList.remove('open'); });
 
 function updateChatBadge(){
   const badge = document.getElementById('chatFabBadge');
@@ -1214,6 +1265,26 @@ function initSocial(){
     MY_GROUPS = snap.val() || {};
     renderGroupList();
   });
+  db.ref('social/users/'+MY_TAG+'/manualAchievements').on('value', snap=>{
+    MY_MANUAL_ACHIEVEMENTS = snap.val() || [];
+    renderAchievements();
+  });
+}
+
+/* Le entrega a mano un logro a cualquier DT por su código, sin que tenga
+   que cumplir la condición — lo usa el admin desde Admin / TV. Se guarda
+   en social/users/<tag>/manualAchievements, así que el logro aparece
+   desbloqueado en vivo apenas ese DT tenga la app abierta (o la próxima
+   vez que la abra). */
+function grantAchievement(tag, achId, onDone){
+  if(typeof db==='undefined'){ onDone && onDone(false, 'sin-conexion'); return; }
+  const ref = db.ref('social/users/'+tag+'/manualAchievements');
+  ref.once('value').then(snap=>{
+    const cur = snap.val() || [];
+    if(cur.includes(achId)){ onDone && onDone(false, 'ya-lo-tiene'); return; }
+    cur.push(achId);
+    return ref.set(cur).then(()=> onDone && onDone(true));
+  }).catch(()=> onDone && onDone(false, 'error'));
 }
 
 document.getElementById('chatFab').addEventListener('click', ()=>{
@@ -1373,6 +1444,7 @@ function setView(view){
 function render(){
   updateSideProgress();
   updateAdminDot();
+  markViewVisited(STATE.view);
   switch(STATE.view){
     case 'inicio': content.innerHTML = renderInicio(); break;
     case 'grupos': content.innerHTML = renderGrupos(); attachGrupoEvents(); break;
@@ -1416,10 +1488,11 @@ function renderInicio(){
     </div>`;
   }).join('');
 
+  const brandHero = Object.assign(defaultBranding(), STATE.branding || {});
   return `
   <div class="hero">
-    <h1>BIENVENIDO AL <span>HIELO ETERNO</span></h1>
-    <p>Mundial 2042 se juega en estadios climatizados bajo auroras. 32 naciones, -12°C, gloria infinita. Administra resultados, vive el cuadro, honra la historia.</p>
+    <h1>${escapeHtml(brandHero.heroPrefix||'')} <span>${escapeHtml(brandHero.heroHighlight||'')}</span></h1>
+    <p>${escapeHtml(brandHero.heroText||'')}</p>
   </div>
 
   <div class="stat-grid">
@@ -2894,6 +2967,21 @@ function renderAdmin(){
         <input type="text" id="brandSubtitleInput" maxlength="60" value="${escapeHtml(brand.subtitle)}" placeholder="Ej: FUEGO Y ARENA · EDICIÓN DESIERTO">
       </div>
 
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Inicio: texto antes del resaltado</label>
+          <input type="text" id="brandHeroPrefixInput" maxlength="40" value="${escapeHtml(brand.heroPrefix)}" placeholder="Ej: BIENVENIDO AL">
+        </div>
+        <div class="field">
+          <label class="mini-label">Inicio: texto resaltado (dorado)</label>
+          <input type="text" id="brandHeroHighlightInput" maxlength="40" value="${escapeHtml(brand.heroHighlight)}" placeholder="Ej: HIELO ETERNO">
+        </div>
+      </div>
+      <div class="field">
+        <label class="mini-label">Inicio: párrafo de bienvenida</label>
+        <textarea id="brandHeroTextInput" maxlength="280" rows="3" placeholder="Texto que ven todos en la pantalla de Inicio">${escapeHtml(brand.heroText)}</textarea>
+      </div>
+
       <div class="field">
         <label class="mini-label">Logo (emoji o imagen)</label>
         <div class="branding-logo-row">
@@ -2920,6 +3008,25 @@ function renderAdmin(){
 
       <div class="branding-live-note"><span class="live-dot on"></span> Cambios en vivo para todos · misma sync que los resultados</div>
       <button class="btn-secondary" id="brandResetBtn" style="margin-top:14px;">Restaurar identidad por defecto (Mundial 2042)</button>
+    </div>
+
+    <div class="admin-box" style="grid-column:1/-1;">
+      <h3>Entregar logros</h3>
+      <p>Otorgale a mano un logro a cualquier DT por su código, sin que tenga que cumplir la condición — útil para premiar algo que pasó fuera de la app.</p>
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Código del DT</label>
+          <input type="text" id="grantTagInput" maxlength="12" placeholder="DT-4821">
+        </div>
+        <div class="field">
+          <label class="mini-label">Logro</label>
+          <select id="grantAchvSelect">
+            ${ACHIEVEMENTS.map(a=>`<option value="${a.id}">${a.icon} ${escapeHtml(a.name)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" id="grantAchvBtn">Entregar logro</button>
+      <div class="hint" id="grantAchvHint"></div>
     </div>
 
     <div class="admin-box">
@@ -2981,6 +3088,44 @@ function attachAdminEvents(){
 
   attachBrandingEvents();
   attachMusicAdminEvents();
+  attachGrantAchievementEvents();
+}
+
+function attachGrantAchievementEvents(){
+  const btn = document.getElementById('grantAchvBtn');
+  if(!btn) return;
+  btn.addEventListener('click', ()=>{
+    const tagInp = document.getElementById('grantTagInput');
+    const sel = document.getElementById('grantAchvSelect');
+    const hint = document.getElementById('grantAchvHint');
+    const tag = tagInp.value.trim().toUpperCase();
+    if(!tag){
+      hint.textContent = 'Ingresá el código del DT (ej: DT-4821).';
+      hint.style.color = 'var(--danger)';
+      return;
+    }
+    const achId = sel.value;
+    hint.textContent = 'Entregando…';
+    hint.style.color = 'var(--muted)';
+    grantAchievement(tag, achId, (ok, reason)=>{
+      if(ok){
+        hint.textContent = `✓ Logro entregado a ${tag}.`;
+        hint.style.color = 'var(--success)';
+        tagInp.value = '';
+      }else if(reason==='ya-lo-tiene'){
+        hint.textContent = `${tag} ya tiene ese logro.`;
+        hint.style.color = 'var(--gold)';
+      }else if(reason==='sin-conexion'){
+        hint.textContent = 'Sin conexión — no se pudo entregar el logro.';
+        hint.style.color = 'var(--danger)';
+      }else{
+        hint.textContent = 'Error al entregar el logro. Probá de nuevo.';
+        hint.style.color = 'var(--danger)';
+      }
+    });
+  });
+  const tagInp = document.getElementById('grantTagInput');
+  if(tagInp) tagInp.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('grantAchvBtn').click(); });
 }
 
 function attachMusicAdminEvents(){
@@ -3045,6 +3190,27 @@ function attachBrandingEvents(){
   if(subtitleInput) subtitleInput.addEventListener('input', ()=>{
     ensureBranding().subtitle = subtitleInput.value;
     applyBranding(); saveTournament();
+  });
+
+  const heroPrefixInput = document.getElementById('brandHeroPrefixInput');
+  if(heroPrefixInput) heroPrefixInput.addEventListener('input', ()=>{
+    ensureBranding().heroPrefix = heroPrefixInput.value;
+    saveTournament();
+    if(STATE.view==='inicio') render();
+  });
+
+  const heroHighlightInput = document.getElementById('brandHeroHighlightInput');
+  if(heroHighlightInput) heroHighlightInput.addEventListener('input', ()=>{
+    ensureBranding().heroHighlight = heroHighlightInput.value;
+    saveTournament();
+    if(STATE.view==='inicio') render();
+  });
+
+  const heroTextInput = document.getElementById('brandHeroTextInput');
+  if(heroTextInput) heroTextInput.addEventListener('input', ()=>{
+    ensureBranding().heroText = heroTextInput.value;
+    saveTournament();
+    if(STATE.view==='inicio') render();
   });
 
   const logoEmojiInput = document.getElementById('brandLogoEmojiInput');
