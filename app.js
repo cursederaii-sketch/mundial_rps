@@ -261,6 +261,23 @@ const HISTORY = [
     }},
 ];
 
+/* Identidad visual del Mundial (título, subtítulo, logo y fondo).
+   La controla el admin desde Admin / TV y se sincroniza en vivo por
+   Firebase igual que los resultados, así que todos los que tengan la
+   app abierta ven el cambio apenas se guarda — pensada para "renovarse"
+   con cada nueva edición sin tocar código. */
+function defaultBranding(){
+  return {
+    title: 'MUNDIAL 2042',
+    subtitle: 'HIELO ETERNO · EDICIÓN POLAR',
+    logoEmoji: '❄',
+    logoImage: null,
+    grad1: '#7c5cff',
+    grad2: '#0a1931',
+    bgImage: null,
+  };
+}
+
 function defaultState(format){
   format = format || 32;
   const matches = [];
@@ -278,6 +295,7 @@ function defaultState(format){
     settings:{grad1:'#7c5cff', grad2:'#0a1931', device:'desktop', notifications:true},
     admin:{unlocked:false},
     awards:{fairplay:'', goleador:''},
+    branding: defaultBranding(),
     format,
     matches,
     knockout: buildEmptyKnockout(format),
@@ -346,6 +364,31 @@ let fbReady = false;
 let applyingRemote = false; // guard to avoid feedback loops
 let syncTimer = null;
 
+/* Aplica STATE.branding al DOM: título de la pestaña, nombre/subtítulo
+   en la topbar, logo (emoji o imagen) y fondo (colores o imagen). Se
+   llama al arrancar la app y cada vez que llega un cambio de branding
+   por Firebase, para que se actualice en vivo sin recargar. */
+function applyBranding(){
+  const b = Object.assign(defaultBranding(), STATE.branding || {});
+  document.title = b.subtitle ? `${b.title} · ${b.subtitle}` : b.title;
+
+  const nameEl = document.getElementById('brandName');
+  const subEl = document.getElementById('brandSub');
+  const markEl = document.getElementById('brandMark');
+  if(nameEl) nameEl.textContent = b.title;
+  if(subEl) subEl.textContent = b.subtitle;
+  if(markEl){
+    markEl.innerHTML = b.logoImage
+      ? `<img src="${b.logoImage}" alt="Logo" class="brand-mark-img">`
+      : escapeHtml(b.logoEmoji || '❄');
+  }
+
+  document.documentElement.style.setProperty('--grad1', b.grad1);
+  document.documentElement.style.setProperty('--grad2', b.grad2);
+  const aurora = document.querySelector('.aurora-bg');
+  if(aurora) aurora.style.backgroundImage = b.bgImage ? `url(${b.bgImage})` : '';
+}
+
 function setLiveStatus(on, label){
   const dot = document.getElementById('liveDot');
   const text = document.getElementById('liveText');
@@ -396,9 +439,11 @@ function initFirebaseSync(){
     if(remote.teamData && remote.teamData.length){ TEAM_DATA = remote.teamData; STATE.teamData = remote.teamData; }
     if(remote.groupLetters && remote.groupLetters.length){ GROUP_LETTERS = remote.groupLetters; STATE.groupLetters = remote.groupLetters; }
     if(remote.format) STATE.format = remote.format;
+    if(remote.branding) STATE.branding = remote.branding;
     normalizeScores(STATE);
     autoFillKnockoutFromGroups();
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
+    applyBranding();
     render();
     applyingRemote = false;
   });
@@ -421,7 +466,7 @@ function syncToFirebase(){
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
-    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32 }).then(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding() }).then(()=>{
       pendingPush = false;
     }).catch(()=>{
       setLiveStatus(false, 'Error de sync');
@@ -2746,6 +2791,7 @@ function renderAdmin(){
       <p class="hint" style="margin-top:14px;">Pista: la clave se te compartió junto con esta app.</p>
     </div>`;
   }
+  const brand = Object.assign(defaultBranding(), STATE.branding || {});
   return `
   <h1 class="page-title">Admin / TV <span class="badge on">Edición desbloqueada</span></h1>
   <div class="admin-panel">
@@ -2786,6 +2832,47 @@ function renderAdmin(){
       <p>Genera 2 imágenes (fase de grupos completa y cuadro de eliminación completo, ambos con resultados) y un .txt con fair play, goleador, muro defensivo y goleada del torneo.</p>
       <button class="btn-primary" id="adminDownloadSummary">Descargar resumen del torneo</button>
     </div>
+    <div class="admin-box branding-box" style="grid-column:1/-1;">
+      <h3>Identidad del Mundial</h3>
+      <p>Título, subtítulo, logo y fondo de esta edición. Se guarda solo (no hace falta botón) y se ve en vivo por todos los que tengan la app abierta.</p>
+
+      <div class="field">
+        <label class="mini-label">Título</label>
+        <input type="text" id="brandTitleInput" maxlength="40" value="${escapeHtml(brand.title)}" placeholder="Ej: MUNDIAL 2046">
+      </div>
+      <div class="field">
+        <label class="mini-label">Subtítulo</label>
+        <input type="text" id="brandSubtitleInput" maxlength="60" value="${escapeHtml(brand.subtitle)}" placeholder="Ej: FUEGO Y ARENA · EDICIÓN DESIERTO">
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Logo (emoji o imagen)</label>
+        <div class="branding-logo-row">
+          <div class="branding-logo-preview" id="brandLogoPreview">${brand.logoImage ? `<img src="${brand.logoImage}" alt="Logo">` : escapeHtml(brand.logoEmoji||'❄')}</div>
+          <input type="text" id="brandLogoEmojiInput" maxlength="4" value="${brand.logoImage ? '' : escapeHtml(brand.logoEmoji||'')}" placeholder="❄" style="width:70px;text-align:center;" ${brand.logoImage?'disabled':''}>
+          <label class="upload-btn" for="brandLogoFileInput"><span>${brand.logoImage?'Cambiar imagen':'Subir imagen (ej: escudo de México)'}</span></label>
+          <input type="file" id="brandLogoFileInput" accept="image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="brandLogoClearBtn" ${brand.logoImage?'':'style="display:none;"'}>Quitar imagen y usar emoji</button>
+        </div>
+        <div class="hint">Si subís una imagen, reemplaza al emoji (se usa como logo en la barra superior). Recomendado: cuadrada, menor a 500KB.</div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Colores de fondo</label>
+        <div class="branding-grad-row">
+          <input type="color" id="brandGrad1Input" value="${brand.grad1}" class="color-block">
+          <input type="color" id="brandGrad2Input" value="${brand.grad2}" class="color-block">
+          <label class="upload-btn" for="brandBgFileInput"><span>${brand.bgImage?'Cambiar imagen de fondo':'Subir imagen de fondo (opcional)'}</span></label>
+          <input type="file" id="brandBgFileInput" accept="image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="brandBgClearBtn" ${brand.bgImage?'':'style="display:none;"'}>Quitar imagen de fondo</button>
+        </div>
+        <div class="hint">La imagen de fondo (si hay) se muestra detrás de las auroras; si no cargás ninguna, se usa el degradé de estos dos colores.</div>
+      </div>
+
+      <div class="branding-live-note"><span class="live-dot on"></span> Cambios en vivo para todos · misma sync que los resultados</div>
+      <button class="btn-secondary" id="brandResetBtn" style="margin-top:14px;">Restaurar identidad por defecto (Mundial 2042)</button>
+    </div>
+
     <div class="admin-box">
       <h3>Bloquear edición</h3>
       <p>Volver a Modo TV: solo lectura, sin poder tocar resultados.</p>
@@ -2831,6 +2918,107 @@ function attachAdminEvents(){
   });
   const lockBtn = document.getElementById('adminLock');
   if(lockBtn) lockBtn.addEventListener('click', ()=>{ STATE.admin.unlocked=false; saveState(); render(); });
+
+  attachBrandingEvents();
+}
+
+/* ---------------- Identidad del Mundial (branding) — eventos ---------------- */
+function ensureBranding(){
+  if(!STATE.branding) STATE.branding = defaultBranding();
+  return STATE.branding;
+}
+
+function readImageFileMax(file, maxMB, onDone){
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('Elegí un archivo de imagen (PNG, JPG o GIF).'); return; }
+  if(file.size > maxMB * 1024 * 1024){
+    alert(`La imagen pesa más de ${maxMB}MB. Como se sincroniza en vivo para todos, usá una imagen más liviana.`);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e)=> onDone(e.target.result);
+  reader.onerror = ()=> alert('No se pudo leer el archivo. Probá con otra imagen.');
+  reader.readAsDataURL(file);
+}
+
+function attachBrandingEvents(){
+  const titleInput = document.getElementById('brandTitleInput');
+  if(titleInput) titleInput.addEventListener('input', ()=>{
+    ensureBranding().title = titleInput.value || 'MUNDIAL';
+    applyBranding(); saveTournament();
+  });
+
+  const subtitleInput = document.getElementById('brandSubtitleInput');
+  if(subtitleInput) subtitleInput.addEventListener('input', ()=>{
+    ensureBranding().subtitle = subtitleInput.value;
+    applyBranding(); saveTournament();
+  });
+
+  const logoEmojiInput = document.getElementById('brandLogoEmojiInput');
+  if(logoEmojiInput) logoEmojiInput.addEventListener('input', ()=>{
+    ensureBranding().logoEmoji = logoEmojiInput.value || '❄';
+    applyBranding(); saveTournament();
+    refreshBrandingPreview();
+  });
+
+  const logoFileInput = document.getElementById('brandLogoFileInput');
+  if(logoFileInput) logoFileInput.addEventListener('change', (e)=>{
+    readImageFileMax(e.target.files[0], 0.8, (dataUrl)=>{
+      ensureBranding().logoImage = dataUrl;
+      applyBranding(); saveTournament();
+      render();
+    });
+  });
+
+  const logoClearBtn = document.getElementById('brandLogoClearBtn');
+  if(logoClearBtn) logoClearBtn.addEventListener('click', ()=>{
+    ensureBranding().logoImage = null;
+    applyBranding(); saveTournament();
+    render();
+  });
+
+  const grad1Input = document.getElementById('brandGrad1Input');
+  if(grad1Input) grad1Input.addEventListener('input', ()=>{
+    ensureBranding().grad1 = grad1Input.value;
+    applyBranding(); saveTournament();
+  });
+  const grad2Input = document.getElementById('brandGrad2Input');
+  if(grad2Input) grad2Input.addEventListener('input', ()=>{
+    ensureBranding().grad2 = grad2Input.value;
+    applyBranding(); saveTournament();
+  });
+
+  const bgFileInput = document.getElementById('brandBgFileInput');
+  if(bgFileInput) bgFileInput.addEventListener('change', (e)=>{
+    readImageFileMax(e.target.files[0], 1.2, (dataUrl)=>{
+      ensureBranding().bgImage = dataUrl;
+      applyBranding(); saveTournament();
+      render();
+    });
+  });
+
+  const bgClearBtn = document.getElementById('brandBgClearBtn');
+  if(bgClearBtn) bgClearBtn.addEventListener('click', ()=>{
+    ensureBranding().bgImage = null;
+    applyBranding(); saveTournament();
+    render();
+  });
+
+  const resetBtn = document.getElementById('brandResetBtn');
+  if(resetBtn) resetBtn.addEventListener('click', ()=>{
+    if(!confirm('¿Restaurar título, subtítulo, logo y fondo a los valores originales del Mundial 2042?')) return;
+    STATE.branding = defaultBranding();
+    applyBranding(); saveTournament();
+    render();
+  });
+}
+
+/* Actualiza solo la miniatura del logo sin re-renderizar todo el panel,
+   para no perder el foco mientras el admin tipea el emoji. */
+function refreshBrandingPreview(){
+  const preview = document.getElementById('brandLogoPreview');
+  const b = STATE.branding || defaultBranding();
+  if(preview && !b.logoImage) preview.textContent = b.logoEmoji || '❄';
 }
 
 function tryUnlock(){
@@ -3226,11 +3414,10 @@ function attachNewTournamentEvents(){
 }
 
 function init(){
-  document.documentElement.style.setProperty('--grad1', STATE.settings.grad1);
-  document.documentElement.style.setProperty('--grad2', STATE.settings.grad2);
   document.querySelector('.app').classList.toggle('force-mobile', STATE.settings.device==='mobile');
   document.getElementById('btnMobile').classList.toggle('active', STATE.settings.device==='mobile');
   document.getElementById('btnDesktop').classList.toggle('active', STATE.settings.device==='desktop');
+  applyBranding();
   applyAvatar();
   bindProfileLiveUpdate();
   attachNewTournamentEvents();
