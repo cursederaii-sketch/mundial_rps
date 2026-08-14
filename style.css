@@ -352,6 +352,13 @@ tbody tr.qualified{ background: linear-gradient(90deg, color-mix(in srgb, var(--
 }
 .bronze-label{ font-family:var(--font-mono); font-size:9px; letter-spacing:1.5px; color:var(--muted);}
 
+.h2h-note{
+  font-family:var(--font-mono); font-size:9px; color:var(--muted); text-align:center;
+  padding:2px 4px 0; letter-spacing:.2px; cursor:help; margin-top:-10px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.h2h-note:hover{ color:var(--teal); }
+
 .bracket-actions{ display:flex; gap:10px; padding: 0 20px 6px; }
 
 /* ---------- Fama: hero + subnav ---------- */

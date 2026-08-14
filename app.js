@@ -190,6 +190,8 @@ const COUNTRY_DB = [
   {code:'SOL', name:'Islas Salomón', iso:'sb', conf:'OFC'},
 ];
 
+const CURRENT_YEAR = 2042;
+
 function confLabel(conf){
   return {UEFA:'🇪🇺 UEFA', CONMEBOL:'🌎 CONMEBOL', CAF:'🌍 CAF', AFC:'🌏 AFC', CONCACAF:'🌎 CONCACAF', OFC:'🌊 OFC'}[conf] || conf;
 }
@@ -228,6 +230,33 @@ const HISTORY = [
       ],
       sf:[
         ['Inglaterra',2,'Uruguay',1], ['Argentina',3,'Costa Rica',1],
+      ],
+    }},
+  {year:2042, champion:'Argentina', runnerUp:'Colombia', finalScore:[12,9], third:'Cabo Verde', fourth:'Costa Rica', thirdScore:[3,2],
+    balon:null, goleador:'Kendry Páez', fairplay:'Bosnia y Herzegovina',
+    muroDefensivo:'Alemania (5 goles recibidos en 3 partidos)', goleada:'Alemania 3-0 Ecuador',
+    group:{label:'GRUPO C', teams:[
+      {name:'Argentina', pj:3,g:3,e:0,p:0,gf:7,gc:4,pts:9},
+      {name:'Costa Rica', pj:3,g:2,e:0,p:1,gf:5,gc:4,pts:6},
+      {name:'Italia', pj:3,g:0,e:1,p:2,gf:5,gc:7,pts:1},
+      {name:'Croacia', pj:3,g:0,e:1,p:2,gf:4,gc:6,pts:1},
+    ]},
+    /* Bicampeonato de Argentina. Cuadro completo tal cual se jugó:
+       Argentina fue Bélgica -> Japón -> Costa Rica -> Colombia (12-9)
+       en la final, y Cabo Verde se quedó el tercer puesto ante Costa Rica. */
+    bracket:{
+      r16:[
+        ['Australia',1,'Japón',3], ['Argentina',7,'Bélgica',5],
+        ['Dinamarca',1,'Estados Unidos',3], ['Panamá',2,'Costa Rica',4],
+        ['Marruecos',6,'Noruega',8], ['Países Bajos',5,'Colombia',7],
+        ['Cabo Verde',12,'Uruguay',10], ['Inglaterra',3,'España',1],
+      ],
+      qf:[
+        ['Japón',1,'Argentina',3], ['Estados Unidos',7,'Costa Rica',9],
+        ['Noruega',2,'Colombia',4], ['Cabo Verde',6,'Inglaterra',4],
+      ],
+      sf:[
+        ['Argentina',4,'Costa Rica',2], ['Colombia',7,'Cabo Verde',5],
       ],
     }},
 ];
@@ -1385,6 +1414,85 @@ function bTeamRow(m, side){
   </div>`;
 }
 
+/* ---------- Historial de enfrentamientos (Head-to-Head) ----------
+   Junta TODOS los resultados que conoce la app: los cruces del Salón
+   de la Fama (finales, terceros puestos, y el cuadro completo de 2038,
+   que es la única edición vieja con bracket detallado guardado) más
+   los resultados ya jugados del torneo actual (grupos y eliminación).
+   Con eso arma, para cualquier par de selecciones, cuántas veces se
+   cruzaron antes y cómo les fue. */
+function h2hKey(a,b){ return [a,b].sort().join('__'); }
+
+function buildH2HIndex(){
+  const idx = {};
+  const add = (home, away, hs, as, year, stage) => {
+    if(!home || !away || home==='???' || away==='???' || home===away) return;
+    hs = Number(hs); as = Number(as);
+    if(!Number.isFinite(hs) || !Number.isFinite(as)) return;
+    const key = h2hKey(home, away);
+    (idx[key] = idx[key] || []).push({home, away, hs, as, year, stage});
+  };
+
+  // Salón de la Fama: final y tercer puesto de cada edición
+  HISTORY.forEach(h=>{
+    if(h.champion && h.runnerUp && h.finalScore) add(h.champion, h.runnerUp, h.finalScore[0], h.finalScore[1], h.year, 'Final');
+    if(h.third && h.fourth && h.thirdScore) add(h.third, h.fourth, h.thirdScore[0], h.thirdScore[1], h.year, 'Tercer puesto');
+    if(h.bracket){
+      const stageLabel = {r16:'Ronda de 16', qf:'Cuartos', sf:'Semifinal'};
+      Object.keys(h.bracket).forEach(roundKey=>{
+        (h.bracket[roundKey]||[]).forEach(([home,hs,away,as])=>{
+          add(home, away, hs, as, h.year, stageLabel[roundKey] || roundKey);
+        });
+      });
+    }
+  });
+
+  // Torneo actual: fase de grupos ya jugada
+  STATE.matches.forEach(m=>{
+    if(isPlayed(m)) add(teamName(m.home), teamName(m.away), m.hs, m.as, CURRENT_YEAR, 'Fase de grupos');
+  });
+
+  // Torneo actual: eliminación directa ya jugada
+  const K = STATE.knockout;
+  const koStages = [
+    [K.r32, 'Dieciseisavos'], [K.r16, 'Ronda de 16'], [K.qf, 'Cuartos'],
+    [K.sf, 'Semifinal'], [K.final ? [K.final] : [], 'Final'], [K.bronze ? [K.bronze] : [], 'Tercer puesto'],
+  ];
+  koStages.forEach(([list, stage])=>{
+    (list||[]).forEach(m=>{
+      if(m && m.homeName && m.awayName && isPlayed(m)) add(teamName(m.homeName), teamName(m.awayName), m.hs, m.as, CURRENT_YEAR, stage);
+    });
+  });
+
+  return idx;
+}
+
+function getH2H(nameA, nameB){
+  if(!nameA || !nameB || nameA==='???' || nameB==='???' || nameA===nameB) return null;
+  const idx = buildH2HIndex();
+  const list = idx[h2hKey(nameA, nameB)];
+  if(!list || !list.length) return null;
+  return list.sort((a,b)=> a.year - b.year);
+}
+
+/* Nota compacta de historial para meter debajo de una tarjeta de partido
+   del cuadro. `m` es un match de knockout con homeName/awayName en CÓDIGO. */
+function h2hNote(m){
+  if(!m || !m.homeName || !m.awayName) return '';
+  const aCode = m.homeName, bCode = m.awayName;
+  const aName = teamName(aCode), bName = teamName(bCode);
+  const meets = getH2H(aName, bName);
+  if(!meets) return '';
+  const last = meets[meets.length-1];
+  const lastIsAHome = last.home === aName;
+  const lastScore = lastIsAHome ? `${last.hs}-${last.as}` : `${last.as}-${last.hs}`;
+  const count = meets.length;
+  const title = meets.slice().reverse()
+    .map(x=> `${x.year} · ${x.stage}: ${x.home} ${x.hs}-${x.as} ${x.away}`)
+    .join('\n');
+  return `<div class="h2h-note" title="${escapeHtml(title)}">🔁${count>1?` (${count})`:''} ${last.year}: ${aCode} ${lastScore} ${bCode}</div>`;
+}
+
 function renderCuadro(){
   const K = STATE.knockout;
   const editable = STATE.admin.unlocked;
@@ -1392,7 +1500,7 @@ function renderCuadro(){
   const col = (label, items) => `
     <div class="bracket-col">
       <div class="bcol-label">${label}</div>
-      ${items.map(m=>`<div class="bmatch">${bTeamRow(m,'home')}${bTeamRow(m,'away')}</div>`).join('')}
+      ${items.map(m=>`<div class="bmatch">${bTeamRow(m,'home')}${bTeamRow(m,'away')}</div>${h2hNote(m)}`).join('')}
     </div>`;
 
   const champion = isPlayed(K.final)
@@ -1414,6 +1522,7 @@ function renderCuadro(){
         <div class="bracket-col">
           <div class="bcol-label">Semifinal</div>
           <div class="bmatch">${bTeamRow(K.sf[0],'home')}${bTeamRow(K.sf[0],'away')}</div>
+          ${h2hNote(K.sf[0])}
         </div>
         <div class="bracket-col bracket-col-final">
           <div class="champion-box">
@@ -1424,15 +1533,18 @@ function renderCuadro(){
             <div class="bcol-label" style="margin:8px 0 0;">Final</div>
             ${bTeamRow(K.final,'home')}${bTeamRow(K.final,'away')}
           </div>
+          ${h2hNote(K.final)}
           <div class="trophy">${assetImg('assets/mundiales/trophy.png','Copa del Mundo','trophy-img')}<span class="trophy-fallback">🏆</span></div>
           <div class="bronze-box">
             <div class="bronze-label">TERCER PUESTO</div>
             ${bTeamRow(K.bronze,'home')}${bTeamRow(K.bronze,'away')}
           </div>
+          ${h2hNote(K.bronze)}
         </div>
         <div class="bracket-col">
           <div class="bcol-label">Semifinal</div>
           <div class="bmatch">${bTeamRow(K.sf[1],'home')}${bTeamRow(K.sf[1],'away')}</div>
+          ${h2hNote(K.sf[1])}
         </div>
         ${col('Cuartos', [K.qf[2],K.qf[3]])}
         ${col('Ronda de 16 · P53-P56', [K.r16[4],K.r16[5],K.r16[6],K.r16[7]])}
@@ -1963,6 +2075,10 @@ function currentChampionEntry(){
 
 function allHallEntries(){
   const current = currentChampionEntry();
+  // Si esa edición ya quedó archivada a mano en HISTORY (con su cuadro
+  // completo), no la duplicamos con la versión "en vivo" leída del
+  // navegador — evita que 2042 aparezca dos veces en el Salón de la Fama.
+  if(current && HISTORY.some(h=>h.year===current.year)) return HISTORY;
   return current ? [...HISTORY, current] : HISTORY;
 }
 
@@ -1976,7 +2092,7 @@ function countryStats(name){
   const subs = all.filter(h=>h.runnerUp===name);
   const thirds = all.filter(h=>h.third===name);
   const latestTitle = titles.length ? Math.max(...titles.map(h=>h.year)) : null;
-  const totalEditions = HISTORY.length + (currentChampionEntry() ? 1 : 0);
+  const totalEditions = all.length;
   return {
     titles: titles.length, subs: subs.length, thirds: thirds.length,
     years: titles.map(h=>h.year).sort((a,b)=>b-a),
@@ -2190,6 +2306,22 @@ function renderCountryDetail(name, champions, all){
   `;
 }
 
+function awardsPanelHtml(entry){
+  const rows = [
+    entry.balon ? ['🥇 Balón de Oro', entry.balon] : null,
+    entry.goleador ? ['🎯 Goleador del Torneo', entry.goleador] : null,
+    entry.fairplay ? ['⚖️ Fair Play', entry.fairplay] : null,
+    entry.muroDefensivo ? ['🧱 Muro Defensivo', entry.muroDefensivo] : null,
+    entry.goleada ? ['💥 Goleada del Torneo', entry.goleada] : null,
+  ].filter(Boolean);
+  if(!rows.length) return '';
+  return `
+  <div class="panel awards-panel" style="padding:20px;margin-top:16px;">
+    <div class="panel-title" style="margin-bottom:10px;">Premios del Torneo</div>
+    <div class="stat-box">${rows.map(([label,val])=>`<div class="stat-row"><span>${label}</span><strong>${escapeHtml(val)}</strong></div>`).join('')}</div>
+  </div>`;
+}
+
 function renderMundialDetail(year, all){
   const entry = all.find(h=>h.year===year);
   if(!entry) return `<div class="empty-note">No hay datos para ${year}.</div>`;
@@ -2204,6 +2336,7 @@ function renderMundialDetail(year, all){
       </div>
     </div>
   </div>
+  ${awardsPanelHtml(entry)}
   <div class="panel year-picker-panel">${renderYearTabs(entry)}</div>
   `;
 }
