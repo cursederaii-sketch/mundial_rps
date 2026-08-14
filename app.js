@@ -1407,7 +1407,7 @@ function renderCuadro(){
       <button class="btn-secondary" id="resetBracket" ${editable?'':'disabled'}>Vaciar cuadro</button>
     </div>
     <div class="bracket-wrap">
-      <div class="bracket">
+      <div class="bracket ${K.r32 ? 'bracket-48' : ''}">
         ${K.r32 ? col('Dieciseisavos', K.r32.slice(0,8)) : ''}
         ${col('Ronda de 16 · P49-P52', [K.r16[0],K.r16[1],K.r16[2],K.r16[3]])}
         ${col('Cuartos', [K.qf[0],K.qf[1]])}
@@ -1415,7 +1415,7 @@ function renderCuadro(){
           <div class="bcol-label">Semifinal</div>
           <div class="bmatch">${bTeamRow(K.sf[0],'home')}${bTeamRow(K.sf[0],'away')}</div>
         </div>
-        <div class="bracket-col">
+        <div class="bracket-col bracket-col-final">
           <div class="champion-box">
             <div class="champion-label">WORLD CHAMPION</div>
             <div class="champion-name">${champion ? teamLabel(champion) : '???'}</div>
