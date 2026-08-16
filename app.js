@@ -2003,6 +2003,43 @@ function buildBracketMatches48(winners, runnersup, bestThirds, seed){
   return matches;
 }
 
+/* Cuenta cuántas veces, en un ordenamiento dado de los 16 cruces de
+   dieciseisavos, dos equipos del MISMO grupo original terminan del MISMO
+   lado del cuadro (los primeros 8 cruces son la mitad izquierda — llevan
+   a la semifinal 1 — y los últimos 8 son la mitad derecha — semifinal 2).
+   No alcanza con que no se enfrenten directo: si ambos quedan del mismo
+   lado, podrían llegar a cruzarse en cuartos o semifinal. */
+function halfClashCount(orderedMatches){
+  const leftCount = {}, rightCount = {};
+  let clashes = 0;
+  orderedMatches.forEach((m, i)=>{
+    const bucket = i < 8 ? leftCount : rightCount;
+    [teamGroupOf(m.home), teamGroupOf(m.away)].forEach(g=>{
+      if(!g) return;
+      bucket[g] = (bucket[g] || 0) + 1;
+      if(bucket[g] > 1) clashes++;
+    });
+  });
+  return clashes;
+}
+
+/* Ordena los 16 cruces en las dos mitades del cuadro evitando, en la
+   medida de lo posible, que dos equipos del mismo grupo original queden
+   del mismo lado (no solo que no se enfrenten directo). Prueba varias
+   semillas deterministas (misma entrada -> mismo resultado siempre) y se
+   queda con la que menos "choques de mitad" tenga, idealmente cero. */
+function orderMatchesAvoidingHalfClashes(matches, baseSeed){
+  let best = matches, bestClashes = Infinity;
+  for(let attempt=0; attempt<80; attempt++){
+    const rng = mulberry32(baseSeed + attempt);
+    const candidate = seededShuffle(matches, rng);
+    const clashes = halfClashCount(candidate);
+    if(clashes < bestClashes){ best = candidate; bestClashes = clashes; }
+    if(bestClashes === 0) break;
+  }
+  return best;
+}
+
 function generateBracketFromGroups48(){
   const winners = {}, runnersup = {};
   GROUP_LETTERS.forEach(g=>{
@@ -2027,8 +2064,7 @@ function generateBracketFromGroups48(){
     if(!hasClash) break;
   }
 
-  const orderRng = mulberry32(BRACKET_BASE_SEED + 1000);
-  const shuffledMatches = seededShuffle(matches, orderRng);
+  const shuffledMatches = orderMatchesAvoidingHalfClashes(matches, BRACKET_BASE_SEED + 1000);
   const K = buildEmptyKnockout(48);
   shuffledMatches.forEach((m,i)=>{
     K.r32[i].homeName = m.home;
