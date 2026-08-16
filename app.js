@@ -1941,103 +1941,119 @@ function computeThirdPlaceRanking(){
     });
 }
 
-/* Evita, en la medida de lo posible, que dos equipos del mismo grupo se
-   crucen ya en dieciseisavos. No es un sorteo oficial FIFA (esa tabla de
-   cruces es enorme); es un armado determinístico (misma semilla → mismo
-   resultado siempre) con esa única restricción. */
-function avoidSameGroupPairs(list, rng){
-  const arr = list.slice();
-  for(let i=0; i<arr.length; i+=2){
-    let guard = 0;
-    while(guard < 20 && teamGroupOf(arr[i]) === teamGroupOf(arr[i+1])){
-      const j = Math.floor(rng()*arr.length);
-      if(j!==i+1 && j!==i){ [arr[i+1], arr[j]] = [arr[j], arr[i+1]]; }
-      guard++;
-    }
-  }
-  return arr;
+/* ============================================================
+   CUADRO OFICIAL FIFA (Mundial 2026, 12 grupos A-L) — Anexo B y C del
+   reglamento del torneo. Ya no es un armado aleatorio/heurístico: es la
+   estructura fija que publicó la FIFA, con el mismo árbol de cruces que
+   usa el Mundial real (partidos 73 a 88 de dieciseisavos, más cómo se
+   combinan después en octavos/cuartos/semis).
+   ============================================================ */
+
+/* Orden de columnas de la tabla de abajo: para cada combinación de 8
+   grupos cuyo tercero clasifica, qué tercero le toca a cada uno de los
+   8 "anfitriones" (grupos A, B, D, E, G, I, K, L), en ese orden. */
+const THIRD_HOST_ORDER = ['A','B','D','E','G','I','K','L'];
+
+/* 495 combinaciones posibles (Anexo C del reglamento): los primeros 8
+   caracteres de cada fila son las letras de grupo que clasificaron
+   tercero (orden alfabético); los últimos 8 son el tercero asignado a
+   cada anfitrión, en el orden de THIRD_HOST_ORDER. */
+const R32_THIRD_TABLE = [
+  'EFGHIJKLEJIFHGLK','DFGHIJKLHGIDJFLK','DEGHIJKLEJIDHGLK','DEFHIJKLEJIDHFLK','DEFGIJKLEGIDJFLK','DEFGHJKLEGJDHFLK','DEFGHIKLEGIDHFLK','DEFGHIJLEGJDHFLI','DEFGHIJKEGJDHFIK','CFGHIJKLHGICJFLK',
+  'CEGHIJKLEJICHGLK','CEFHIJKLEJICHFLK','CEFGIJKLEGICJFLK','CEFGHJKLEGJCHFLK','CEFGHIKLEGICHFLK','CEFGHIJLEGJCHFLI','CEFGHIJKEGJCHFIK','CDGHIJKLHGICJDLK','CDFHIJKLCJIDHFLK','CDFGIJKLCGIDJFLK',
+  'CDFGHJKLCGJDHFLK','CDFGHIKLCGIDHFLK','CDFGHIJLCGJDHFLI','CDFGHIJKCGJDHFIK','CDEHIJKLEJICHDLK','CDEGIJKLEGICJDLK','CDEGHJKLEGJCHDLK','CDEGHIKLEGICHDLK','CDEGHIJLEGJCHDLI','CDEGHIJKEGJCHDIK',
+  'CDEFIJKLCJEDIFLK','CDEFHJKLCJEDHFLK','CDEFHIKLCEIDHFLK','CDEFHIJLCJEDHFLI','CDEFHIJKCJEDHFIK','CDEFGJKLCGEDJFLK','CDEFGIKLCGEDIFLK','CDEFGIJLCGEDJFLI','CDEFGIJKCGEDJFIK','CDEFGHKLCGEDHFLK',
+  'CDEFGHJLCGJDHFLE','CDEFGHJKCGJDHFEK','CDEFGHILCGEDHFLI','CDEFGHIKCGEDHFIK','CDEFGHIJCGJDHFEI','BFGHIJKLHJBFIGLK','BEGHIJKLEJIBHGLK','BEFHIJKLEJBFIHLK','BEFGIJKLEJBFIGLK','BEFGHJKLEJBFHGLK',
+  'BEFGHIKLEGBFIHLK','BEFGHIJLEJBFHGLI','BEFGHIJKEJBFHGIK','BDGHIJKLHJBDIGLK','BDFHIJKLHJBDIFLK','BDFGIJKLIGBDJFLK','BDFGHJKLHGBDJFLK','BDFGHIKLHGBDIFLK','BDFGHIJLHGBDJFLI','BDFGHIJKHGBDJFIK',
+  'BDEHIJKLEJBDIHLK','BDEGIJKLEJBDIGLK','BDEGHJKLEJBDHGLK','BDEGHIKLEGBDIHLK','BDEGHIJLEJBDHGLI','BDEGHIJKEJBDHGIK','BDEFIJKLEJBDIFLK','BDEFHJKLEJBDHFLK','BDEFHIKLEIBDHFLK','BDEFHIJLEJBDHFLI',
+  'BDEFHIJKEJBDHFIK','BDEFGJKLEGBDJFLK','BDEFGIKLEGBDIFLK','BDEFGIJLEGBDJFLI','BDEFGIJKEGBDJFIK','BDEFGHKLEGBDHFLK','BDEFGHJLHGBDJFLE','BDEFGHJKHGBDJFEK','BDEFGHILEGBDHFLI','BDEFGHIKEGBDHFIK',
+  'BDEFGHIJHGBDJFEI','BCGHIJKLHJBCIGLK','BCFHIJKLHJBCIFLK','BCFGIJKLIGBCJFLK','BCFGHJKLHGBCJFLK','BCFGHIKLHGBCIFLK','BCFGHIJLHGBCJFLI','BCFGHIJKHGBCJFIK','BCEHIJKLEJBCIHLK','BCEGIJKLEJBCIGLK',
+  'BCEGHJKLEJBCHGLK','BCEGHIKLEGBCIHLK','BCEGHIJLEJBCHGLI','BCEGHIJKEJBCHGIK','BCEFIJKLEJBCIFLK','BCEFHJKLEJBCHFLK','BCEFHIKLEIBCHFLK','BCEFHIJLEJBCHFLI','BCEFHIJKEJBCHFIK','BCEFGJKLEGBCJFLK',
+  'BCEFGIKLEGBCIFLK','BCEFGIJLEGBCJFLI','BCEFGIJKEGBCJFIK','BCEFGHKLEGBCHFLK','BCEFGHJLHGBCJFLE','BCEFGHJKHGBCJFEK','BCEFGHILEGBCHFLI','BCEFGHIKEGBCHFIK','BCEFGHIJHGBCJFEI','BCDHIJKLHJBCIDLK',
+  'BCDGIJKLIGBCJDLK','BCDGHJKLHGBCJDLK','BCDGHIKLHGBCIDLK','BCDGHIJLHGBCJDLI','BCDGHIJKHGBCJDIK','BCDFIJKLCJBDIFLK','BCDFHJKLCJBDHFLK','BCDFHIKLCIBDHFLK','BCDFHIJLCJBDHFLI','BCDFHIJKCJBDHFIK',
+  'BCDFGJKLCGBDJFLK','BCDFGIKLCGBDIFLK','BCDFGIJLCGBDJFLI','BCDFGIJKCGBDJFIK','BCDFGHKLCGBDHFLK','BCDFGHJLCGBDHFLJ','BCDFGHJKHGBCJFDK','BCDFGHILCGBDHFLI','BCDFGHIKCGBDHFIK','BCDFGHIJHGBCJFDI',
+  'BCDEIJKLEJBCIDLK','BCDEHJKLEJBCHDLK','BCDEHIKLEIBCHDLK','BCDEHIJLEJBCHDLI','BCDEHIJKEJBCHDIK','BCDEGJKLEGBCJDLK','BCDEGIKLEGBCIDLK','BCDEGIJLEGBCJDLI','BCDEGIJKEGBCJDIK','BCDEGHKLEGBCHDLK',
+  'BCDEGHJLHGBCJDLE','BCDEGHJKHGBCJDEK','BCDEGHILEGBCHDLI','BCDEGHIKEGBCHDIK','BCDEGHIJHGBCJDEI','BCDEFJKLCJBDEFLK','BCDEFIKLCEBDIFLK','BCDEFIJLCJBDEFLI','BCDEFIJKCJBDEFIK','BCDEFHKLCEBDHFLK',
+  'BCDEFHJLCJBDHFLE','BCDEFHJKCJBDHFEK','BCDEFHILCEBDHFLI','BCDEFHIKCEBDHFIK','BCDEFHIJCJBDHFEI','BCDEFGKLCGBDEFLK','BCDEFGJLCGBDJFLE','BCDEFGJKCGBDJFEK','BCDEFGILCGBDEFLI','BCDEFGIKCGBDEFIK',
+  'BCDEFGIJCGBDJFEI','BCDEFGHLCGBDHFLE','BCDEFGHKCGBDHFEK','BCDEFGHJHGBCJFDE','BCDEFGHICGBDHFEI','AFGHIJKLHJIFAGLK','AEGHIJKLEJIAHGLK','AEFHIJKLEJIFAHLK','AEFGIJKLEJIFAGLK','AEFGHJKLEGJFAHLK',
+  'AEFGHIKLEGIFAHLK','AEFGHIJLEGJFAHLI','AEFGHIJKEGJFAHIK','ADGHIJKLHJIDAGLK','ADFHIJKLHJIDAFLK','ADFGIJKLIGJDAFLK','ADFGHJKLHGJDAFLK','ADFGHIKLHGIDAFLK','ADFGHIJLHGJDAFLI','ADFGHIJKHGJDAFIK',
+  'ADEHIJKLEJIDAHLK','ADEGIJKLEJIDAGLK','ADEGHJKLEGJDAHLK','ADEGHIKLEGIDAHLK','ADEGHIJLEGJDAHLI','ADEGHIJKEGJDAHIK','ADEFIJKLEJIDAFLK','ADEFHJKLHJEDAFLK','ADEFHIKLHEIDAFLK','ADEFHIJLHJEDAFLI',
+  'ADEFHIJKHJEDAFIK','ADEFGJKLEGJDAFLK','ADEFGIKLEGIDAFLK','ADEFGIJLEGJDAFLI','ADEFGIJKEGJDAFIK','ADEFGHKLHGEDAFLK','ADEFGHJLHGJDAFLE','ADEFGHJKHGJDAFEK','ADEFGHILHGEDAFLI','ADEFGHIKHGEDAFIK',
+  'ADEFGHIJHGJDAFEI','ACGHIJKLHJICAGLK','ACFHIJKLHJICAFLK','ACFGIJKLIGJCAFLK','ACFGHJKLHGJCAFLK','ACFGHIKLHGICAFLK','ACFGHIJLHGJCAFLI','ACFGHIJKHGJCAFIK','ACEHIJKLEJICAHLK','ACEGIJKLEJICAGLK',
+  'ACEGHJKLEGJCAHLK','ACEGHIKLEGICAHLK','ACEGHIJLEGJCAHLI','ACEGHIJKEGJCAHIK','ACEFIJKLEJICAFLK','ACEFHJKLHJECAFLK','ACEFHIKLHEICAFLK','ACEFHIJLHJECAFLI','ACEFHIJKHJECAFIK','ACEFGJKLEGJCAFLK',
+  'ACEFGIKLEGICAFLK','ACEFGIJLEGJCAFLI','ACEFGIJKEGJCAFIK','ACEFGHKLHGECAFLK','ACEFGHJLHGJCAFLE','ACEFGHJKHGJCAFEK','ACEFGHILHGECAFLI','ACEFGHIKHGECAFIK','ACEFGHIJHGJCAFEI','ACDHIJKLHJICADLK',
+  'ACDGIJKLIGJCADLK','ACDGHJKLHGJCADLK','ACDGHIKLHGICADLK','ACDGHIJLHGJCADLI','ACDGHIJKHGJCADIK','ACDFIJKLCJIDAFLK','ACDFHJKLHJFCADLK','ACDFHIKLHFICADLK','ACDFHIJLHJFCADLI','ACDFHIJKHJFCADIK',
+  'ACDFGJKLCGJDAFLK','ACDFGIKLCGIDAFLK','ACDFGIJLCGJDAFLI','ACDFGIJKCGJDAFIK','ACDFGHKLHGFCADLK','ACDFGHJLCGJDAFLH','ACDFGHJKHGJCAFDK','ACDFGHILHGFCADLI','ACDFGHIKHGFCADIK','ACDFGHIJHGJCAFDI',
+  'ACDEIJKLEJICADLK','ACDEHJKLHJECADLK','ACDEHIKLHEICADLK','ACDEHIJLHJECADLI','ACDEHIJKHJECADIK','ACDEGJKLEGJCADLK','ACDEGIKLEGICADLK','ACDEGIJLEGJCADLI','ACDEGIJKEGJCADIK','ACDEGHKLHGECADLK',
+  'ACDEGHJLHGJCADLE','ACDEGHJKHGJCADEK','ACDEGHILHGECADLI','ACDEGHIKHGECADIK','ACDEGHIJHGJCADEI','ACDEFJKLCJEDAFLK','ACDEFIKLCEIDAFLK','ACDEFIJLCJEDAFLI','ACDEFIJKCJEDAFIK','ACDEFHKLHEFCADLK',
+  'ACDEFHJLHJFCADLE','ACDEFHJKHJECAFDK','ACDEFHILHEFCADLI','ACDEFHIKHEFCADIK','ACDEFHIJHJECAFDI','ACDEFGKLCGEDAFLK','ACDEFGJLCGJDAFLE','ACDEFGJKCGJDAFEK','ACDEFGILCGEDAFLI','ACDEFGIKCGEDAFIK',
+  'ACDEFGIJCGJDAFEI','ACDEFGHLHGFCADLE','ACDEFGHKHGECAFDK','ACDEFGHJHGJCAFDE','ACDEFGHIHGECAFDI','ABGHIJKLHJBAIGLK','ABFHIJKLHJBAIFLK','ABFGIJKLIJBFAGLK','ABFGHJKLHJBFAGLK','ABFGHIKLHGBAIFLK',
+  'ABFGHIJLHJBFAGLI','ABFGHIJKHJBFAGIK','ABEHIJKLEJBAIHLK','ABEGIJKLEJBAIGLK','ABEGHJKLEJBAHGLK','ABEGHIKLEGBAIHLK','ABEGHIJLEJBAHGLI','ABEGHIJKEJBAHGIK','ABEFIJKLEJBAIFLK','ABEFHJKLEJBFAHLK',
+  'ABEFHIKLEIBFAHLK','ABEFHIJLEJBFAHLI','ABEFHIJKEJBFAHIK','ABEFGJKLEJBFAGLK','ABEFGIKLEGBAIFLK','ABEFGIJLEJBFAGLI','ABEFGIJKEJBFAGIK','ABEFGHKLEGBFAHLK','ABEFGHJLHJBFAGLE','ABEFGHJKHJBFAGEK',
+  'ABEFGHILEGBFAHLI','ABEFGHIKEGBFAHIK','ABEFGHIJHJBFAGEI','ABDHIJKLIJBDAHLK','ABDGIJKLIJBDAGLK','ABDGHJKLHJBDAGLK','ABDGHIKLIGBDAHLK','ABDGHIJLHJBDAGLI','ABDGHIJKHJBDAGIK','ABDFIJKLIJBDAFLK',
+  'ABDFHJKLHJBDAFLK','ABDFHIKLHIBDAFLK','ABDFHIJLHJBDAFLI','ABDFHIJKHJBDAFIK','ABDFGJKLFJBDAGLK','ABDFGIKLIGBDAFLK','ABDFGIJLFJBDAGLI','ABDFGIJKFJBDAGIK','ABDFGHKLHGBDAFLK','ABDFGHJLHGBDAFLJ',
+  'ABDFGHJKHGBDAFJK','ABDFGHILHGBDAFLI','ABDFGHIKHGBDAFIK','ABDFGHIJHGBDAFIJ','ABDEIJKLEJBAIDLK','ABDEHJKLEJBDAHLK','ABDEHIKLEIBDAHLK','ABDEHIJLEJBDAHLI','ABDEHIJKEJBDAHIK','ABDEGJKLEJBDAGLK',
+  'ABDEGIKLEGBAIDLK','ABDEGIJLEJBDAGLI','ABDEGIJKEJBDAGIK','ABDEGHKLEGBDAHLK','ABDEGHJLHJBDAGLE','ABDEGHJKHJBDAGEK','ABDEGHILEGBDAHLI','ABDEGHIKEGBDAHIK','ABDEGHIJHJBDAGEI','ABDEFJKLEJBDAFLK',
+  'ABDEFIKLEIBDAFLK','ABDEFIJLEJBDAFLI','ABDEFIJKEJBDAFIK','ABDEFHKLHEBDAFLK','ABDEFHJLHJBDAFLE','ABDEFHJKHJBDAFEK','ABDEFHILHEBDAFLI','ABDEFHIKHEBDAFIK','ABDEFHIJHJBDAFEI','ABDEFGKLEGBDAFLK',
+  'ABDEFGJLEGBDAFLJ','ABDEFGJKEGBDAFJK','ABDEFGILEGBDAFLI','ABDEFGIKEGBDAFIK','ABDEFGIJEGBDAFIJ','ABDEFGHLHGBDAFLE','ABDEFGHKHGBDAFEK','ABDEFGHJHGBDAFEJ','ABDEFGHIHGBDAFEI','ABCHIJKLIJBCAHLK',
+  'ABCGIJKLIJBCAGLK','ABCGHJKLHJBCAGLK','ABCGHIKLIGBCAHLK','ABCGHIJLHJBCAGLI','ABCGHIJKHJBCAGIK','ABCFIJKLIJBCAFLK','ABCFHJKLHJBCAFLK','ABCFHIKLHIBCAFLK','ABCFHIJLHJBCAFLI','ABCFHIJKHJBCAFIK',
+  'ABCFGJKLCJBFAGLK','ABCFGIKLIGBCAFLK','ABCFGIJLCJBFAGLI','ABCFGIJKCJBFAGIK','ABCFGHKLHGBCAFLK','ABCFGHJLHGBCAFLJ','ABCFGHJKHGBCAFJK','ABCFGHILHGBCAFLI','ABCFGHIKHGBCAFIK','ABCFGHIJHGBCAFIJ',
+  'ABCEIJKLEJBAICLK','ABCEHJKLEJBCAHLK','ABCEHIKLEIBCAHLK','ABCEHIJLEJBCAHLI','ABCEHIJKEJBCAHIK','ABCEGJKLEJBCAGLK','ABCEGIKLEGBAICLK','ABCEGIJLEJBCAGLI','ABCEGIJKEJBCAGIK','ABCEGHKLEGBCAHLK',
+  'ABCEGHJLHJBCAGLE','ABCEGHJKHJBCAGEK','ABCEGHILEGBCAHLI','ABCEGHIKEGBCAHIK','ABCEGHIJHJBCAGEI','ABCEFJKLEJBCAFLK','ABCEFIKLEIBCAFLK','ABCEFIJLEJBCAFLI','ABCEFIJKEJBCAFIK','ABCEFHKLHEBCAFLK',
+  'ABCEFHJLHJBCAFLE','ABCEFHJKHJBCAFEK','ABCEFHILHEBCAFLI','ABCEFHIKHEBCAFIK','ABCEFHIJHJBCAFEI','ABCEFGKLEGBCAFLK','ABCEFGJLEGBCAFLJ','ABCEFGJKEGBCAFJK','ABCEFGILEGBCAFLI','ABCEFGIKEGBCAFIK',
+  'ABCEFGIJEGBCAFIJ','ABCEFGHLHGBCAFLE','ABCEFGHKHGBCAFEK','ABCEFGHJHGBCAFEJ','ABCEFGHIHGBCAFEI','ABCDIJKLIJBCADLK','ABCDHJKLHJBCADLK','ABCDHIKLHIBCADLK','ABCDHIJLHJBCADLI','ABCDHIJKHJBCADIK',
+  'ABCDGJKLCJBDAGLK','ABCDGIKLIGBCADLK','ABCDGIJLCJBDAGLI','ABCDGIJKCJBDAGIK','ABCDGHKLHGBCADLK','ABCDGHJLHGBCADLJ','ABCDGHJKHGBCADJK','ABCDGHILHGBCADLI','ABCDGHIKHGBCADIK','ABCDGHIJHGBCADIJ',
+  'ABCDFJKLCJBDAFLK','ABCDFIKLCIBDAFLK','ABCDFIJLCJBDAFLI','ABCDFIJKCJBDAFIK','ABCDFHKLHFBCADLK','ABCDFHJLCJBDAFLH','ABCDFHJKHJBCAFDK','ABCDFHILHFBCADLI','ABCDFHIKHFBCADIK','ABCDFHIJHJBCAFDI',
+  'ABCDFGKLCGBDAFLK','ABCDFGJLCGBDAFLJ','ABCDFGJKCGBDAFJK','ABCDFGILCGBDAFLI','ABCDFGIKCGBDAFIK','ABCDFGIJCGBDAFIJ','ABCDFGHLCGBDAFLH','ABCDFGHKHGBCAFDK','ABCDFGHJHGBCAFDJ','ABCDFGHIHGBCAFDI',
+  'ABCDEJKLEJBCADLK','ABCDEIKLEIBCADLK','ABCDEIJLEJBCADLI','ABCDEIJKEJBCADIK','ABCDEHKLHEBCADLK','ABCDEHJLHJBCADLE','ABCDEHJKHJBCADEK','ABCDEHILHEBCADLI','ABCDEHIKHEBCADIK','ABCDEHIJHJBCADEI',
+  'ABCDEGKLEGBCADLK','ABCDEGJLEGBCADLJ','ABCDEGJKEGBCADJK','ABCDEGILEGBCADLI','ABCDEGIKEGBCADIK','ABCDEGIJEGBCADIJ','ABCDEGHLHGBCADLE','ABCDEGHKHGBCADEK','ABCDEGHJHGBCADEJ','ABCDEGHIHGBCADEI',
+  'ABCDEFKLCEBDAFLK','ABCDEFJLCJBDAFLE','ABCDEFJKCJBDAFEK','ABCDEFILCEBDAFLI','ABCDEFIKCEBDAFIK','ABCDEFIJCJBDAFEI','ABCDEFHLHFBCADLE','ABCDEFHKHEBCAFDK','ABCDEFHJHJBCAFDE','ABCDEFHIHEBCAFDI',
+  'ABCDEFGLCGBDAFLE','ABCDEFGKCGBDAFEK','ABCDEFGJCGBDAFEJ','ABCDEFGICGBDAFEI','ABCDEFGHHGBCAFDE',
+];
+
+function thirdAssignmentFor(qualifiedGroupsSorted){
+  const key = qualifiedGroupsSorted.join('');
+  const row = R32_THIRD_TABLE.find(r=> r.slice(0,8) === key);
+  if(!row) return null;
+  const assign = {};
+  THIRD_HOST_ORDER.forEach((host,i)=>{ assign[host] = row[8+i]; });
+  return assign;
 }
 
-/* Grupos cuyo primer puesto enfrenta a un "mejor tercero" en dieciseisavos
-   (esquema real del Mundial 2026 de 48 equipos). Los primeros de los otros
-   4 grupos (C, F, H, J) enfrentan a un segundo puesto. La tabla oficial de
-   la FIFA tiene 495 combinaciones posibles para asignar qué tercero le
-   toca a cada uno de estos 8 primeros; acá usamos un criterio propio más
-   simple (aleatorio, evitando que un equipo enfrente a otro de su propio
-   grupo) en vez de replicar esa tabla completa. */
-const THIRD_PLACE_HOST_GROUPS = ['A','B','D','E','G','I','K','L'];
+/* Los 16 cruces de dieciseisavos, en el orden exacto del árbol oficial
+   (partidos 73-88), ya acomodados de forma que este mismo array, leído
+   de a pares consecutivos, arma octavos/cuartos/semis correctamente vía
+   propagateBracket() — sin necesidad de ningún shuffle.
+   t:'W'  -> campeón de ese grupo
+   t:'RU' -> segundo de ese grupo
+   t:'TH' -> mejor tercero asignado a ese grupo "anfitrión" (según la
+             tabla oficial de arriba) */
+const R32_FIXED_BRACKET = [
+  {home:{t:'W', g:'E'}, away:{t:'TH', h:'E'}},   // Partido 74
+  {home:{t:'W', g:'I'}, away:{t:'TH', h:'I'}},   // Partido 77
+  {home:{t:'RU', g:'A'}, away:{t:'RU', g:'B'}},  // Partido 73
+  {home:{t:'W', g:'F'}, away:{t:'RU', g:'C'}},   // Partido 75
+  {home:{t:'RU', g:'K'}, away:{t:'RU', g:'L'}},  // Partido 83
+  {home:{t:'W', g:'H'}, away:{t:'RU', g:'J'}},   // Partido 84
+  {home:{t:'W', g:'D'}, away:{t:'TH', h:'D'}},   // Partido 81
+  {home:{t:'W', g:'G'}, away:{t:'TH', h:'G'}},   // Partido 82
+  {home:{t:'W', g:'C'}, away:{t:'RU', g:'F'}},   // Partido 76
+  {home:{t:'RU', g:'E'}, away:{t:'RU', g:'I'}},  // Partido 78
+  {home:{t:'W', g:'A'}, away:{t:'TH', h:'A'}},   // Partido 79
+  {home:{t:'W', g:'L'}, away:{t:'TH', h:'L'}},   // Partido 80
+  {home:{t:'W', g:'J'}, away:{t:'RU', g:'H'}},   // Partido 86
+  {home:{t:'RU', g:'D'}, away:{t:'RU', g:'G'}},  // Partido 88
+  {home:{t:'W', g:'B'}, away:{t:'TH', h:'B'}},   // Partido 85
+  {home:{t:'W', g:'K'}, away:{t:'TH', h:'K'}},   // Partido 87
+];
 
-/* Arma los 16 cruces de dieciseisavos según las reglas de arriba. Como el
-   armado tiene margen aleatorio, reintenta unas cuantas veces hasta
-   conseguir una versión sin ningún cruce entre equipos del mismo grupo
-   (o se queda con el mejor intento si tiene mala suerte 40 veces seguidas,
-   algo prácticamente imposible). */
-function buildBracketMatches48(winners, runnersup, bestThirds, seed){
-  const rng = mulberry32(seed);
-  const matches = [];
-
-  const hostGroups = seededShuffle(THIRD_PLACE_HOST_GROUPS.slice(), rng);
-  const thirdsPool = seededShuffle(bestThirds.slice(), rng);
-  hostGroups.forEach(hostGroup=>{
-    let idx = thirdsPool.findIndex(t=> t.group!==hostGroup);
-    if(idx===-1) idx = 0;
-    const third = thirdsPool.splice(idx,1)[0];
-    matches.push({home: winners[hostGroup], away: third.team.code});
-  });
-
-  const otherWinnerGroups = GROUP_LETTERS.filter(g=> !THIRD_PLACE_HOST_GROUPS.includes(g));
-  const runnerUpGroupsLeft = seededShuffle(GROUP_LETTERS.slice(), rng);
-  otherWinnerGroups.forEach(wg=>{
-    let idx = runnerUpGroupsLeft.findIndex(rg=> rg!==wg);
-    if(idx===-1) idx = 0;
-    const rg = runnerUpGroupsLeft.splice(idx,1)[0];
-    matches.push({home: winners[wg], away: runnersup[rg]});
-  });
-
-  const remainingRunnerCodes = runnerUpGroupsLeft.map(g=> runnersup[g]);
-  const pairedRunners = avoidSameGroupPairs(seededShuffle(remainingRunnerCodes, rng), rng);
-  for(let i=0;i<pairedRunners.length;i+=2){
-    matches.push({home: pairedRunners[i], away: pairedRunners[i+1]});
-  }
-
-  return matches;
-}
-
-/* Cuenta cuántas veces, en un ordenamiento dado de los 16 cruces de
-   dieciseisavos, dos equipos del MISMO grupo original terminan del MISMO
-   lado del cuadro (los primeros 8 cruces son la mitad izquierda — llevan
-   a la semifinal 1 — y los últimos 8 son la mitad derecha — semifinal 2).
-   No alcanza con que no se enfrenten directo: si ambos quedan del mismo
-   lado, podrían llegar a cruzarse en cuartos o semifinal. */
-function halfClashCount(orderedMatches){
-  const leftCount = {}, rightCount = {};
-  let clashes = 0;
-  orderedMatches.forEach((m, i)=>{
-    const bucket = i < 8 ? leftCount : rightCount;
-    [teamGroupOf(m.home), teamGroupOf(m.away)].forEach(g=>{
-      if(!g) return;
-      bucket[g] = (bucket[g] || 0) + 1;
-      if(bucket[g] > 1) clashes++;
-    });
-  });
-  return clashes;
-}
-
-/* Ordena los 16 cruces en las dos mitades del cuadro evitando, en la
-   medida de lo posible, que dos equipos del mismo grupo original queden
-   del mismo lado (no solo que no se enfrenten directo). Prueba varias
-   semillas deterministas (misma entrada -> mismo resultado siempre) y se
-   queda con la que menos "choques de mitad" tenga, idealmente cero. */
-function orderMatchesAvoidingHalfClashes(matches, baseSeed){
-  let best = matches, bestClashes = Infinity;
-  for(let attempt=0; attempt<80; attempt++){
-    const rng = mulberry32(baseSeed + attempt);
-    const candidate = seededShuffle(matches, rng);
-    const clashes = halfClashCount(candidate);
-    if(clashes < bestClashes){ best = candidate; bestClashes = clashes; }
-    if(bestClashes === 0) break;
-  }
-  return best;
+function resolveSlot(slot, winners, runnersup, thirdTeamByGroup, thirdAssign){
+  if(slot.t === 'W') return winners[slot.g] || null;
+  if(slot.t === 'RU') return runnersup[slot.g] || null;
+  // 'TH': tercero asignado a este anfitrión según la tabla oficial
+  if(!thirdAssign) return null;
+  const thirdGroup = thirdAssign[slot.h];
+  return thirdGroup ? (thirdTeamByGroup[thirdGroup] || null) : null;
 }
 
 function generateBracketFromGroups48(){
@@ -2048,33 +2064,23 @@ function generateBracketFromGroups48(){
     runnersup[g] = st[1].code;
   });
   const bestThirds = computeThirdPlaceRanking().slice(0,8); // [{group, team}]
+  const thirdTeamByGroup = {};
+  bestThirds.forEach(x=>{ thirdTeamByGroup[x.group] = x.team.code; });
+  const qualifiedGroupsSorted = bestThirds.map(x=>x.group).sort();
+  const thirdAssign = thirdAssignmentFor(qualifiedGroupsSorted);
 
-  /* Semilla fija: para los mismos resultados de grupos (mismos winners,
-     runnersup y bestThirds), este bucle siempre recorre exactamente las
-     mismas semillas en el mismo orden y llega al mismo resultado final.
-     Nada de esto usa Math.random, así que "Generar cuadro" ya no vuelve
-     a tirar los dados — el cuadro queda fijo hasta que cambien los
-     resultados de grupos. */
-  const BRACKET_BASE_SEED = 480226;
-  let matches = null;
-  for(let attempt=0; attempt<40; attempt++){
-    const candidate = buildBracketMatches48(winners, runnersup, bestThirds, BRACKET_BASE_SEED + attempt);
-    const hasClash = candidate.some(m=> teamGroupOf(m.home)===teamGroupOf(m.away));
-    matches = candidate;
-    if(!hasClash) break;
-  }
-
-  const shuffledMatches = orderMatchesAvoidingHalfClashes(matches, BRACKET_BASE_SEED + 1000);
   const K = buildEmptyKnockout(48);
-  shuffledMatches.forEach((m,i)=>{
-    K.r32[i].homeName = m.home;
-    K.r32[i].awayName = m.away;
+  R32_FIXED_BRACKET.forEach((m,i)=>{
+    K.r32[i].homeName = resolveSlot(m.home, winners, runnersup, thirdTeamByGroup, thirdAssign);
+    K.r32[i].awayName = resolveSlot(m.away, winners, runnersup, thirdTeamByGroup, thirdAssign);
   });
   STATE.knockout = K;
   propagateBracket();
   saveTournament();
   render();
-  if(!allGroupsComplete()){
+  if(!thirdAssign){
+    alert('No se encontró la combinación de terceros en la tabla oficial (revisá que haya exactamente 12 grupos completos). El cuadro quedó con esos cruces vacíos.');
+  }else if(!allGroupsComplete()){
     alert('Nota: algunos grupos aún no terminaron. El cuadro se armó con las posiciones actuales (incluyendo terceros) y puede cambiar.');
   }
 }
