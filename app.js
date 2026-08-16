@@ -2068,7 +2068,13 @@ async function rewriteStylesheetsForCapture(clonedDoc){
   const killAnim = clonedDoc.createElement('style');
   killAnim.textContent = `
     *, *::before, *::after{ animation: none !important; transition: none !important; }
-    .bracket-col:not(:last-child):not(.bracket-col-final)::after{ background: var(--line) !important; }
+    .bracket-wrap, .bracket-wrap *, .bracket-wrap *::before, .bracket-wrap *::after{
+      background-image: none !important;
+    }
+    .bracket-wrap{ background-color: #05060f !important; }
+    .bracket-col:not(:last-child):not(.bracket-col-final)::after{ background-color: #2a3550 !important; }
+    .bteam.winner{ background-color: rgba(46,204,113,.14) !important; }
+    .champion-box{ background-color: rgba(212,175,55,.14) !important; }
   `;
   clonedDoc.head.appendChild(killAnim);
 }
