@@ -1473,6 +1473,12 @@ function render(){
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
     default: content.innerHTML = renderInicio();
   }
+  /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
+     y se vuelve a poner la clase (con un reflow en el medio) para que el
+     navegador la corra de nuevo, en vez de solo la primera vez. */
+  content.classList.remove('view-fade');
+  void content.offsetWidth;
+  content.classList.add('view-fade');
 }
 
 function updateSideProgress(){
@@ -1569,7 +1575,45 @@ function renderGrupos(){
   return `
   <h1 class="page-title">Fase de Grupos ${editable?'':'<span class="badge">MODO TV</span>'}</h1>
   <div class="group-preview-grid">${groupsHtml}</div>
+  ${renderBestThirdsTable()}
   `;
+}
+
+/* Tabla de "mejores terceros": solo tiene sentido en el formato de 48
+   selecciones (12 grupos, clasifican los 8 mejores terceros de 12 para
+   llegar a 32). En el formato de 32 (8 grupos de 4) no existe esta
+   instancia: clasifican directo los 2 primeros de cada grupo. */
+function renderBestThirdsTable(){
+  if(STATE.format !== 48) return '';
+  const ranking = computeThirdPlaceRanking(); // ya viene ordenado: pts, dg, gf
+  if(ranking.length===0) return '';
+  const allDone = allGroupsComplete();
+  return `
+  <div class="panel" style="margin-top:24px;">
+    <div class="panel-head">
+      <div class="panel-title">Tabla de Mejores Terceros</div>
+      <span class="badge ${allDone?'on':''}">${allDone?'✓ Definida':'Provisoria'}</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th class="num">Pos.</th><th>Grupo</th><th>Equipo</th>
+        <th class="num">PJ</th><th class="num">PG</th><th class="num">PE</th><th class="num">PP</th>
+        <th class="num">GF</th><th class="num">GC</th><th class="num">DG</th><th class="num">PTS</th><th></th>
+      </tr></thead>
+      <tbody>
+      ${ranking.map((r,i)=>`<tr class="${i<8?'qualified':''}">
+        <td class="num">${i+1}</td>
+        <td class="num" style="font-family:var(--font-mono);color:var(--muted);">${r.group}</td>
+        <td class="team-cell"><span class="flag">${teamFlag(r.team.code)}</span>${teamName(r.team.code)}</td>
+        <td class="num">${r.team.pj}</td><td class="num">${r.team.pg}</td><td class="num">${r.team.pe}</td><td class="num">${r.team.pp}</td>
+        <td class="num">${r.team.gf}</td><td class="num">${r.team.gc}</td><td class="num">${r.team.gf-r.team.gc}</td>
+        <td class="num pts-cell">${r.team.pts}</td>
+        <td class="num"><span class="badge ${i<8?'on':''}" style="font-size:9.5px;">${i<8?'Clasifica':'Eliminado'}</span></td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    <p style="padding:0 20px 16px;color:var(--muted);font-size:12px;">Clasifican los 8 mejores terceros de los 12 grupos. ${allDone?'':'El orden puede cambiar hasta que terminen todos los grupos.'}</p>
+  </div>`;
 }
 
 function attachGrupoEvents(){
