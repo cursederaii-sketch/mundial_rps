@@ -99,6 +99,25 @@ function shuffleArray(arr){
   return a;
 }
 
+/* PRNG determinístico (mulberry32): con la misma semilla siempre da la
+   misma secuencia de números. Se usa para el cuadro de 48 equipos, que
+   tiene que dar SIEMPRE el mismo resultado para los mismos resultados de
+   grupos, en vez de volver a tirar los dados cada vez que se genera. */
+function mulberry32(seed){
+  let t = seed >>> 0;
+  return function(){
+    t = (t + 0x6D2B79F5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function seededShuffle(arr, rng){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
 /* ---------------- Etapa 1: base de países para "Nuevo Torneo" ---------------- */
 const COUNTRY_DB = [
   // UEFA
@@ -1880,13 +1899,14 @@ function computeThirdPlaceRanking(){
 
 /* Evita, en la medida de lo posible, que dos equipos del mismo grupo se
    crucen ya en dieciseisavos. No es un sorteo oficial FIFA (esa tabla de
-   cruces es enorme), es un sorteo al azar con esa única restricción. */
-function avoidSameGroupPairs(list){
+   cruces es enorme); es un armado determinístico (misma semilla → mismo
+   resultado siempre) con esa única restricción. */
+function avoidSameGroupPairs(list, rng){
   const arr = list.slice();
   for(let i=0; i<arr.length; i+=2){
     let guard = 0;
     while(guard < 20 && teamGroupOf(arr[i]) === teamGroupOf(arr[i+1])){
-      const j = Math.floor(Math.random()*arr.length);
+      const j = Math.floor(rng()*arr.length);
       if(j!==i+1 && j!==i){ [arr[i+1], arr[j]] = [arr[j], arr[i+1]]; }
       guard++;
     }
@@ -1908,11 +1928,12 @@ const THIRD_PLACE_HOST_GROUPS = ['A','B','D','E','G','I','K','L'];
    conseguir una versión sin ningún cruce entre equipos del mismo grupo
    (o se queda con el mejor intento si tiene mala suerte 40 veces seguidas,
    algo prácticamente imposible). */
-function buildBracketMatches48(winners, runnersup, bestThirds){
+function buildBracketMatches48(winners, runnersup, bestThirds, seed){
+  const rng = mulberry32(seed);
   const matches = [];
 
-  const hostGroups = shuffleArray(THIRD_PLACE_HOST_GROUPS.slice());
-  const thirdsPool = shuffleArray(bestThirds.slice());
+  const hostGroups = seededShuffle(THIRD_PLACE_HOST_GROUPS.slice(), rng);
+  const thirdsPool = seededShuffle(bestThirds.slice(), rng);
   hostGroups.forEach(hostGroup=>{
     let idx = thirdsPool.findIndex(t=> t.group!==hostGroup);
     if(idx===-1) idx = 0;
@@ -1921,7 +1942,7 @@ function buildBracketMatches48(winners, runnersup, bestThirds){
   });
 
   const otherWinnerGroups = GROUP_LETTERS.filter(g=> !THIRD_PLACE_HOST_GROUPS.includes(g));
-  const runnerUpGroupsLeft = shuffleArray(GROUP_LETTERS.slice());
+  const runnerUpGroupsLeft = seededShuffle(GROUP_LETTERS.slice(), rng);
   otherWinnerGroups.forEach(wg=>{
     let idx = runnerUpGroupsLeft.findIndex(rg=> rg!==wg);
     if(idx===-1) idx = 0;
@@ -1930,7 +1951,7 @@ function buildBracketMatches48(winners, runnersup, bestThirds){
   });
 
   const remainingRunnerCodes = runnerUpGroupsLeft.map(g=> runnersup[g]);
-  const pairedRunners = avoidSameGroupPairs(shuffleArray(remainingRunnerCodes));
+  const pairedRunners = avoidSameGroupPairs(seededShuffle(remainingRunnerCodes, rng), rng);
   for(let i=0;i<pairedRunners.length;i+=2){
     matches.push({home: pairedRunners[i], away: pairedRunners[i+1]});
   }
@@ -1947,15 +1968,23 @@ function generateBracketFromGroups48(){
   });
   const bestThirds = computeThirdPlaceRanking().slice(0,8); // [{group, team}]
 
+  /* Semilla fija: para los mismos resultados de grupos (mismos winners,
+     runnersup y bestThirds), este bucle siempre recorre exactamente las
+     mismas semillas en el mismo orden y llega al mismo resultado final.
+     Nada de esto usa Math.random, así que "Generar cuadro" ya no vuelve
+     a tirar los dados — el cuadro queda fijo hasta que cambien los
+     resultados de grupos. */
+  const BRACKET_BASE_SEED = 480226;
   let matches = null;
   for(let attempt=0; attempt<40; attempt++){
-    const candidate = buildBracketMatches48(winners, runnersup, bestThirds);
+    const candidate = buildBracketMatches48(winners, runnersup, bestThirds, BRACKET_BASE_SEED + attempt);
     const hasClash = candidate.some(m=> teamGroupOf(m.home)===teamGroupOf(m.away));
     matches = candidate;
     if(!hasClash) break;
   }
 
-  const shuffledMatches = shuffleArray(matches);
+  const orderRng = mulberry32(BRACKET_BASE_SEED + 1000);
+  const shuffledMatches = seededShuffle(matches, orderRng);
   const K = buildEmptyKnockout(48);
   shuffledMatches.forEach((m,i)=>{
     K.r32[i].homeName = m.home;
