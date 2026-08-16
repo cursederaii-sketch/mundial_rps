@@ -1969,31 +1969,32 @@ function thirdAssignmentFor(bestThirds){
   return assign;
 }
 
-/* Los 16 cruces de dieciseisavos, en el orden exacto del árbol oficial
-   (partidos 73-88), ya acomodados de forma que este mismo array, leído
-   de a pares consecutivos, arma octavos/cuartos/semis correctamente vía
-   propagateBracket() — sin necesidad de ningún shuffle.
+/* Los 16 cruces de dieciseisavos, en el orden Llave Izquierda (8) +
+   Llave Derecha (8) tal como los pediste. Leído de a pares consecutivos
+   arma octavos/cuartos/semis vía propagateBracket().
    t:'W'  -> campeón de ese grupo
    t:'RU' -> segundo de ese grupo
-   t:'TH' -> mejor tercero asignado a ese grupo "anfitrión" (según la
-             tabla oficial de arriba) */
+   t:'TH' -> mejor tercero asignado a ese grupo "anfitrión" (según
+             HOST_THIRD_RANK, más arriba) */
 const R32_FIXED_BRACKET = [
-  {home:{t:'W', g:'E'}, away:{t:'TH', h:'E'}},   // Partido 74
-  {home:{t:'W', g:'I'}, away:{t:'TH', h:'I'}},   // Partido 77
-  {home:{t:'RU', g:'A'}, away:{t:'RU', g:'B'}},  // Partido 73
-  {home:{t:'W', g:'F'}, away:{t:'RU', g:'C'}},   // Partido 75
-  {home:{t:'RU', g:'K'}, away:{t:'RU', g:'L'}},  // Partido 83
-  {home:{t:'W', g:'H'}, away:{t:'RU', g:'J'}},   // Partido 84
-  {home:{t:'W', g:'D'}, away:{t:'TH', h:'D'}},   // Partido 81
-  {home:{t:'W', g:'G'}, away:{t:'TH', h:'G'}},   // Partido 82
-  {home:{t:'W', g:'C'}, away:{t:'RU', g:'F'}},   // Partido 76
-  {home:{t:'RU', g:'E'}, away:{t:'RU', g:'I'}},  // Partido 78
-  {home:{t:'W', g:'A'}, away:{t:'TH', h:'A'}},   // Partido 79
-  {home:{t:'W', g:'L'}, away:{t:'TH', h:'L'}},   // Partido 80
-  {home:{t:'W', g:'J'}, away:{t:'RU', g:'H'}},   // Partido 86
-  {home:{t:'RU', g:'D'}, away:{t:'RU', g:'G'}},  // Partido 88
-  {home:{t:'W', g:'B'}, away:{t:'TH', h:'B'}},   // Partido 85
-  {home:{t:'W', g:'K'}, away:{t:'TH', h:'K'}},   // Partido 87
+  // ---- Llave Izquierda ----
+  {home:{t:'RU', g:'A'}, away:{t:'RU', g:'B'}},  // Bolivia vs Egipto
+  {home:{t:'W', g:'E'}, away:{t:'TH', h:'E'}},   // Haití vs (5º Tercero)
+  {home:{t:'W', g:'F'}, away:{t:'RU', g:'C'}},   // Marruecos vs Brasil
+  {home:{t:'W', g:'I'}, away:{t:'TH', h:'I'}},   // Serbia vs (8º Tercero)
+  {home:{t:'RU', g:'E'}, away:{t:'RU', g:'I'}},  // Islas Vírgenes vs Australia
+  {home:{t:'W', g:'A'}, away:{t:'TH', h:'A'}},   // Colombia vs (3º Tercero)
+  {home:{t:'W', g:'L'}, away:{t:'TH', h:'L'}},   // Ghana vs (2º Tercero)
+  {home:{t:'W', g:'D'}, away:{t:'TH', h:'D'}},   // Croacia vs (4º Tercero)
+  // ---- Llave Derecha ----
+  {home:{t:'W', g:'G'}, away:{t:'TH', h:'G'}},   // Inglaterra vs (6º Tercero)
+  {home:{t:'RU', g:'K'}, away:{t:'RU', g:'L'}},  // Argentina vs Panamá
+  {home:{t:'W', g:'H'}, away:{t:'RU', g:'J'}},   // Trinidad y Tobago vs Bosnia y Herzegovina
+  {home:{t:'W', g:'B'}, away:{t:'TH', h:'B'}},   // Japón vs (7º Tercero)
+  {home:{t:'W', g:'J'}, away:{t:'RU', g:'G'}},   // Perú vs Cabo Verde
+  {home:{t:'W', g:'K'}, away:{t:'TH', h:'K'}},   // Uruguay vs (1º Tercero)
+  {home:{t:'RU', g:'D'}, away:{t:'RU', g:'F'}},  // Países Bajos vs Canadá
+  {home:{t:'W', g:'C'}, away:{t:'RU', g:'H'}},   // Nueva Zelanda vs Grecia
 ];
 
 function resolveSlot(slot, winners, runnersup, thirdTeamByGroup, thirdAssign){
