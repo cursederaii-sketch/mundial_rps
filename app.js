@@ -1894,21 +1894,73 @@ function avoidSameGroupPairs(list){
   return arr;
 }
 
+/* Grupos cuyo primer puesto enfrenta a un "mejor tercero" en dieciseisavos
+   (esquema real del Mundial 2026 de 48 equipos). Los primeros de los otros
+   4 grupos (C, F, H, J) enfrentan a un segundo puesto. La tabla oficial de
+   la FIFA tiene 495 combinaciones posibles para asignar qué tercero le
+   toca a cada uno de estos 8 primeros; acá usamos un criterio propio más
+   simple (aleatorio, evitando que un equipo enfrente a otro de su propio
+   grupo) en vez de replicar esa tabla completa. */
+const THIRD_PLACE_HOST_GROUPS = ['A','B','D','E','G','I','K','L'];
+
+/* Arma los 16 cruces de dieciseisavos según las reglas de arriba. Como el
+   armado tiene margen aleatorio, reintenta unas cuantas veces hasta
+   conseguir una versión sin ningún cruce entre equipos del mismo grupo
+   (o se queda con el mejor intento si tiene mala suerte 40 veces seguidas,
+   algo prácticamente imposible). */
+function buildBracketMatches48(winners, runnersup, bestThirds){
+  const matches = [];
+
+  const hostGroups = shuffleArray(THIRD_PLACE_HOST_GROUPS.slice());
+  const thirdsPool = shuffleArray(bestThirds.slice());
+  hostGroups.forEach(hostGroup=>{
+    let idx = thirdsPool.findIndex(t=> t.group!==hostGroup);
+    if(idx===-1) idx = 0;
+    const third = thirdsPool.splice(idx,1)[0];
+    matches.push({home: winners[hostGroup], away: third.team.code});
+  });
+
+  const otherWinnerGroups = GROUP_LETTERS.filter(g=> !THIRD_PLACE_HOST_GROUPS.includes(g));
+  const runnerUpGroupsLeft = shuffleArray(GROUP_LETTERS.slice());
+  otherWinnerGroups.forEach(wg=>{
+    let idx = runnerUpGroupsLeft.findIndex(rg=> rg!==wg);
+    if(idx===-1) idx = 0;
+    const rg = runnerUpGroupsLeft.splice(idx,1)[0];
+    matches.push({home: winners[wg], away: runnersup[rg]});
+  });
+
+  const remainingRunnerCodes = runnerUpGroupsLeft.map(g=> runnersup[g]);
+  const pairedRunners = avoidSameGroupPairs(shuffleArray(remainingRunnerCodes));
+  for(let i=0;i<pairedRunners.length;i+=2){
+    matches.push({home: pairedRunners[i], away: pairedRunners[i+1]});
+  }
+
+  return matches;
+}
+
 function generateBracketFromGroups48(){
-  const winners = [], runnersup = [];
+  const winners = {}, runnersup = {};
   GROUP_LETTERS.forEach(g=>{
     const st = computeStandings(g);
-    winners.push(st[0].code);
-    runnersup.push(st[1].code);
+    winners[g] = st[0].code;
+    runnersup[g] = st[1].code;
   });
-  const bestThirds = computeThirdPlaceRanking().slice(0,8).map(x=>x.team.code);
+  const bestThirds = computeThirdPlaceRanking().slice(0,8); // [{group, team}]
 
-  const qualifiers = avoidSameGroupPairs(shuffleArray([...winners, ...runnersup, ...bestThirds]));
-  const K = buildEmptyKnockout(48);
-  for(let i=0;i<16;i++){
-    K.r32[i].homeName = qualifiers[i*2];
-    K.r32[i].awayName = qualifiers[i*2+1];
+  let matches = null;
+  for(let attempt=0; attempt<40; attempt++){
+    const candidate = buildBracketMatches48(winners, runnersup, bestThirds);
+    const hasClash = candidate.some(m=> teamGroupOf(m.home)===teamGroupOf(m.away));
+    matches = candidate;
+    if(!hasClash) break;
   }
+
+  const shuffledMatches = shuffleArray(matches);
+  const K = buildEmptyKnockout(48);
+  shuffledMatches.forEach((m,i)=>{
+    K.r32[i].homeName = m.home;
+    K.r32[i].awayName = m.away;
+  });
   STATE.knockout = K;
   propagateBracket();
   saveTournament();
