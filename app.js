@@ -20,7 +20,7 @@ const ISO_MAP = {
 function flagImgIso(iso, size, alt){
   size = size || 'w40';
   if(!iso) return '<span class="flag-fallback">🏳</span>';
-  return `<img class="flag-ico" src="https://flagcdn.com/${size}/${iso}.png" alt="${alt||''}" loading="lazy">`;
+  return `<img class="flag-ico" src="https://flagcdn.com/${size}/${iso}.png" alt="${alt||''}">`;
 }
 function flagImg(code, size){
   const iso = ISO_MAP[code] || (COUNTRY_DB.find(c=>c.code===code)||{}).iso;
@@ -2066,14 +2066,37 @@ async function rewriteStylesheetsForCapture(clonedDoc){
      Apagamos animaciones/transiciones SOLO en el documento clonado (la
      página real sigue animando normal) para que el color quede fijo y plano. */
   const killAnim = clonedDoc.createElement('style');
-  killAnim.textContent = '*, *::before, *::after{ animation: none !important; transition: none !important; }';
+  killAnim.textContent = `
+    *, *::before, *::after{ animation: none !important; transition: none !important; }
+    .bracket-col:not(:last-child):not(.bracket-col-final)::after{ background: var(--line) !important; }
+  `;
   clonedDoc.head.appendChild(killAnim);
+}
+
+/* Espera a que TODAS las imágenes (banderas, etc.) dentro de un elemento
+   terminen de cargar antes de sacarle una foto con html2canvas. Un timeout
+   fijo (ej. 350ms) alcanza para el cuadro de 32, pero el de 48 tiene el
+   doble de banderas y es más ancho, así que varias podían seguir sin
+   cargar cuando arrancaba la captura y hacían explotar html2canvas. */
+async function waitForImages(el, timeoutMs){
+  const imgs = Array.from(el.querySelectorAll('img'));
+  await Promise.race([
+    Promise.all(imgs.map(img=>{
+      if(img.complete && img.naturalWidth>0) return Promise.resolve();
+      return new Promise(resolve=>{
+        img.addEventListener('load', resolve, {once:true});
+        img.addEventListener('error', resolve, {once:true});
+      });
+    })),
+    new Promise(resolve=> setTimeout(resolve, timeoutMs||6000))
+  ]);
 }
 
 async function captureAndDownload(selector, filename){
   try{
     const el = document.querySelector(selector);
     if(!el || typeof html2canvas==='undefined') return false;
+    await waitForImages(el, 6000);
     const canvasPromise = html2canvas(el, {
       backgroundColor:'#0a1220', scale:2, useCORS:true, imageTimeout:8000, logging:false,
       onclone: (clonedDoc)=> rewriteStylesheetsForCapture(clonedDoc)
