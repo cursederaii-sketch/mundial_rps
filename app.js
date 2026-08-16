@@ -1894,73 +1894,21 @@ function avoidSameGroupPairs(list){
   return arr;
 }
 
-/* Grupos cuyo primer puesto enfrenta a un "mejor tercero" en dieciseisavos
-   (esquema real del Mundial 2026 de 48 equipos). Los primeros de los otros
-   4 grupos (C, F, H, J) enfrentan a un segundo puesto. La tabla oficial de
-   la FIFA tiene 495 combinaciones posibles para asignar qué tercero le
-   toca a cada uno de estos 8 primeros; acá usamos un criterio propio más
-   simple (aleatorio, evitando que un equipo enfrente a otro de su propio
-   grupo) en vez de replicar esa tabla completa. */
-const THIRD_PLACE_HOST_GROUPS = ['A','B','D','E','G','I','K','L'];
-
-/* Arma los 16 cruces de dieciseisavos según las reglas de arriba. Como el
-   armado tiene margen aleatorio, reintenta unas cuantas veces hasta
-   conseguir una versión sin ningún cruce entre equipos del mismo grupo
-   (o se queda con el mejor intento si tiene mala suerte 40 veces seguidas,
-   algo prácticamente imposible). */
-function buildBracketMatches48(winners, runnersup, bestThirds){
-  const matches = [];
-
-  const hostGroups = shuffleArray(THIRD_PLACE_HOST_GROUPS.slice());
-  const thirdsPool = shuffleArray(bestThirds.slice());
-  hostGroups.forEach(hostGroup=>{
-    let idx = thirdsPool.findIndex(t=> t.group!==hostGroup);
-    if(idx===-1) idx = 0;
-    const third = thirdsPool.splice(idx,1)[0];
-    matches.push({home: winners[hostGroup], away: third.team.code});
-  });
-
-  const otherWinnerGroups = GROUP_LETTERS.filter(g=> !THIRD_PLACE_HOST_GROUPS.includes(g));
-  const runnerUpGroupsLeft = shuffleArray(GROUP_LETTERS.slice());
-  otherWinnerGroups.forEach(wg=>{
-    let idx = runnerUpGroupsLeft.findIndex(rg=> rg!==wg);
-    if(idx===-1) idx = 0;
-    const rg = runnerUpGroupsLeft.splice(idx,1)[0];
-    matches.push({home: winners[wg], away: runnersup[rg]});
-  });
-
-  const remainingRunnerCodes = runnerUpGroupsLeft.map(g=> runnersup[g]);
-  const pairedRunners = avoidSameGroupPairs(shuffleArray(remainingRunnerCodes));
-  for(let i=0;i<pairedRunners.length;i+=2){
-    matches.push({home: pairedRunners[i], away: pairedRunners[i+1]});
-  }
-
-  return matches;
-}
-
 function generateBracketFromGroups48(){
-  const winners = {}, runnersup = {};
+  const winners = [], runnersup = [];
   GROUP_LETTERS.forEach(g=>{
     const st = computeStandings(g);
-    winners[g] = st[0].code;
-    runnersup[g] = st[1].code;
+    winners.push(st[0].code);
+    runnersup.push(st[1].code);
   });
-  const bestThirds = computeThirdPlaceRanking().slice(0,8); // [{group, team}]
+  const bestThirds = computeThirdPlaceRanking().slice(0,8).map(x=>x.team.code);
 
-  let matches = null;
-  for(let attempt=0; attempt<40; attempt++){
-    const candidate = buildBracketMatches48(winners, runnersup, bestThirds);
-    const hasClash = candidate.some(m=> teamGroupOf(m.home)===teamGroupOf(m.away));
-    matches = candidate;
-    if(!hasClash) break;
-  }
-
-  const shuffledMatches = shuffleArray(matches);
+  const qualifiers = avoidSameGroupPairs(shuffleArray([...winners, ...runnersup, ...bestThirds]));
   const K = buildEmptyKnockout(48);
-  shuffledMatches.forEach((m,i)=>{
-    K.r32[i].homeName = m.home;
-    K.r32[i].awayName = m.away;
-  });
+  for(let i=0;i<16;i++){
+    K.r32[i].homeName = qualifiers[i*2];
+    K.r32[i].awayName = qualifiers[i*2+1];
+  }
   STATE.knockout = K;
   propagateBracket();
   saveTournament();
@@ -2045,7 +1993,7 @@ function stripColorMix(cssText){
   return cssText.replace(/color-mix\(\s*in\s+[a-z0-9\- ]+,\s*([^,]+?)\s+[\d.]+%\s*,\s*[^)]+\)/gi, '$1');
 }
 
-async function rewriteStylesheetsForCapture(clonedDoc){
+async function rewriteStylesheetsForCapture(clonedDoc, selector){
   const links = Array.from(clonedDoc.querySelectorAll('link[rel="stylesheet"]'));
   await Promise.all(links.map(async (link)=>{
     try{
@@ -2064,7 +2012,14 @@ async function rewriteStylesheetsForCapture(clonedDoc){
      pulsar un color (box-shadow). Mientras animan, el navegador interpola
      ese color usando el espacio "oklab", que html2canvas no sabe parsear.
      Apagamos animaciones/transiciones SOLO en el documento clonado (la
-     página real sigue animando normal) para que el color quede fijo y plano. */
+     página real sigue animando normal) para que el color quede fijo y plano.
+
+     También sacamos TODOS los degradés de fondo dentro del cuadro: alguno
+     (línea conectora, resaltado de ganador, caja del campeón) quedaba en
+     0px en el momento exacto de la captura y hacía explotar html2canvas
+     con "createPattern... width or height of 0". En vez de perseguir cuál
+     es el culpable puntual, los sacamos todos y les devolvemos un color
+     sólido parecido a mano. */
   const killAnim = clonedDoc.createElement('style');
   killAnim.textContent = `
     *, *::before, *::after{ animation: none !important; transition: none !important; }
@@ -2077,6 +2032,20 @@ async function rewriteStylesheetsForCapture(clonedDoc){
     .champion-box{ background-color: rgba(212,175,55,.14) !important; }
   `;
   clonedDoc.head.appendChild(killAnim);
+
+  /* El contenedor del cuadro tiene scroll horizontal (overflow-x:auto) para
+     que entre en pantalla. html2canvas por defecto solo capturaba lo que
+     entraba en ese ancho visible, así que el PNG salía cortado a la mitad.
+     Acá forzamos que, SOLO en el clon usado para la foto, se vea todo el
+     ancho real sin scroll ni recorte. */
+  if(selector){
+    const cloneEl = clonedDoc.querySelector(selector);
+    if(cloneEl){
+      cloneEl.style.overflow = 'visible';
+      cloneEl.style.maxWidth = 'none';
+      cloneEl.style.width = cloneEl.scrollWidth + 'px';
+    }
+  }
 }
 
 /* Espera a que TODAS las imágenes (banderas, etc.) dentro de un elemento
@@ -2103,9 +2072,16 @@ async function captureAndDownload(selector, filename){
     const el = document.querySelector(selector);
     if(!el || typeof html2canvas==='undefined') return false;
     await waitForImages(el, 6000);
+    /* El cuadro de 48 selecciones tiene scroll horizontal (más ancho que la
+       pantalla) — le pasamos el ancho/alto REALES del contenido (no lo que
+       se ve en pantalla) para que la foto salga completa, no cortada. */
+    const fullWidth = Math.max(el.scrollWidth, el.offsetWidth);
+    const fullHeight = Math.max(el.scrollHeight, el.offsetHeight);
     const canvasPromise = html2canvas(el, {
       backgroundColor:'#0a1220', scale:2, useCORS:true, imageTimeout:8000, logging:false,
-      onclone: (clonedDoc)=> rewriteStylesheetsForCapture(clonedDoc)
+      width: fullWidth, height: fullHeight,
+      windowWidth: fullWidth, windowHeight: fullHeight,
+      onclone: (clonedDoc)=> rewriteStylesheetsForCapture(clonedDoc, selector)
     });
     const timeoutPromise = new Promise((_, reject)=> setTimeout(()=> reject(new Error('Timeout: la captura tardó más de 12s (probablemente una imagen externa no cargó)')), 12000));
     const canvas = await Promise.race([canvasPromise, timeoutPromise]);
@@ -3782,14 +3758,5 @@ function init(){
   initFirebaseSync();
   initSocial();
 }
-
-/* Si el navegador restaura la página desde la Back-Forward Cache (al
-   volver con el botón "atrás"), la conexión WebSocket de Firebase queda
-   cortada y el chat se queda mudo (no manda ni recibe mensajes) aunque
-   el resto de la app se vea normal. Forzamos un reload limpio para que
-   Firebase se reconecte de cero en ese caso. */
-window.addEventListener('pageshow', (event)=>{
-  if(event.persisted) location.reload();
-});
 
 init();
