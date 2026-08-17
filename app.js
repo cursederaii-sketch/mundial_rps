@@ -307,6 +307,30 @@ function defaultMusic(){
   return { youtubeUrl: null };
 }
 
+/* Momentos Históricos: "pegatinas" con foto + relato que el admin va
+   sumando desde Admin / TV. Se muestran en Salón de Fama → Momentos
+   Históricos, apiladas de arriba hacia abajo (la más nueva primero), y
+   se sincronizan en vivo por Firebase igual que branding/música. La
+   imagen puede ser una ruta local (ej: "assets/elavic.png", subida a
+   mano al repo) o una imagen subida desde el admin (se guarda en base64). */
+function defaultMoments(){
+  return [
+    {
+      id: 'momento-congo-2046',
+      title: 'Congo llegó a octavos',
+      image: 'assets/elavic.png',
+      text:
+`El silencio invadió todas las casas de Kinshasa. Pero no era el mismo silencio de antes.
+Sobre el campo del Estadio Azteca, los jugadores de Congo estaban tirados sobre el césped, con las manos en la cabeza, mirando el cielo de México. No era una imagen de fracaso. Era la imagen de quien lo dio todo y se quedó a un paso. Nunca antes se había visto una imagen tan desoladora y tan orgullosa a la vez sobre un campo de fútbol. En sus ojos no había vergüenza, había agotamiento y una tristeza infinita, la de saber que el sueño se terminaba ahí. Había sido el pitido final de los octavos de final. Australia había ganado 2 a 0. Y con ese gol, se terminaba el Mundial 2046 para Congo.
+Pero nadie en ese estadio iba a olvidar cómo habían llegado hasta ahí. En los dieciseisavos de final, Congo había hecho lo imposible. Había goleado 3 a 1 a Colombia, el primer campeón del mundo y actual subcampeón. El equipo de las estrellas, el favorito de todos. Nadie les daba una oportunidad. Pero Elavic los había preparado para eso. Durante toda la fase de grupos les había repetido que no estaban ahí para participar, que estaban para competir. Y esa tarde, su Congo vertical, rápido, sin miedo, destrozó a un gigante. Fue una victoria que retumbó en todo el planeta.
+Por eso dolía tanto esta derrota. Porque por primera vez, Congo no perdía como víctima. Perdió como equipo grande, como quien ya pertenece. Al borde del campo, Elavic, El DT, no se movió. Con los brazos en jarra, miraba a sus jugadores en el suelo. No los retó. Los dejó llorar. Sabía que esas lágrimas no eran de derrota, eran de historia. A su alrededor, los australianos celebraban su pase a cuartos, pero todas las cámaras apuntaban a la camiseta celeste.
+Aquella imagen, la del Congo eliminado pero de pie, se convertiría en una de las más recordadas del Mundial de México 2046. No por la derrota, sino porque mostraba la esencia misma del fútbol: que a veces se pierde, pero se pierde después de haber ganado todo. Congo no se fue en octavos. Congo llegó a octavos.`,
+      signature: 'Gracias Elavic, por ponernos en la historia. Mundial 2046.',
+      ts: Date.now(),
+    },
+  ];
+}
+
 /* Acepta watch?v=, youtu.be/, embed/ y shorts/ y devuelve solo el ID del
    video (o null si el link no es reconocible). */
 function extractYouTubeId(url){
@@ -343,6 +367,7 @@ function defaultState(format){
     awards:{fairplay:'', goleador:''},
     branding: defaultBranding(),
     music: defaultMusic(),
+    moments: defaultMoments(),
     format,
     matches,
     knockout: buildEmptyKnockout(format),
@@ -510,6 +535,7 @@ function initFirebaseSync(){
     if(remote.format) STATE.format = remote.format;
     if(remote.branding) STATE.branding = remote.branding;
     if(remote.music) STATE.music = remote.music;
+    if(remote.moments) STATE.moments = remote.moments;
     normalizeScores(STATE);
     autoFillKnockoutFromGroups();
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
@@ -537,7 +563,7 @@ function syncToFirebase(){
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
-    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding(), music: STATE.music||defaultMusic() }).then(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding(), music: STATE.music||defaultMusic(), moments: STATE.moments||defaultMoments() }).then(()=>{
       pendingPush = false;
     }).catch(()=>{
       setLiveStatus(false, 'Error de sync');
@@ -1471,6 +1497,7 @@ function render(){
     case 'fama': content.innerHTML = renderFama(); attachFamaEvents(); break;
     case 'ajustes': content.innerHTML = renderAjustes(); attachAjustesEvents(); break;
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
+    case 'momentos': content.innerHTML = renderMomentos(); break;
     default: content.innerHTML = renderInicio();
   }
   /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
@@ -2799,6 +2826,46 @@ function renderFamaHistoria(all){
   </div>`;
 }
 
+/* Momentos Históricos: sección propia (no vive dentro de Salón de Fama).
+   Feed vertical de "pegatinas" (foto + relato) que el admin carga desde
+   Admin / TV, listadas de arriba hacia abajo con la más reciente primero. */
+function renderMomentos(){
+  const moments = (STATE.moments||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const body = moments.length ? `
+  <div class="moments-feed">
+    ${moments.map((m,i)=>renderMomentSticker(m,i)).join('')}
+  </div>` : `
+  <div class="moments-empty">
+    <div class="moments-empty-ico">📌</div>
+    <div>Todavía no hay momentos históricos cargados.</div>
+    <div class="hint">El admin puede sumar el primero desde Admin / TV.</div>
+  </div>`;
+
+  return `
+  <div class="fama-hero">
+    <div class="fama-hero-trophy"><span class="fama-trophy-fallback" style="display:block;">📌</span></div>
+    <div>
+      <h1 class="page-title" style="margin-bottom:4px;">Momentos Históricos</h1>
+      <div class="fama-hero-sub">Postales que quedaron grabadas en la memoria del Mundial</div>
+    </div>
+  </div>
+  ${body}
+  `;
+}
+
+function renderMomentSticker(m, i){
+  const tilt = (i % 2 === 0) ? '-1.3deg' : '1.5deg';
+  const paragraphs = (m.text||'').split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
+  return `
+  <article class="moment-sticker" style="--tilt:${tilt};">
+    <span class="moment-sticker-pin">📌</span>
+    ${m.image ? `<div class="moment-sticker-photo">${assetImg(m.image, escapeHtml(m.title||'Momento histórico'),'moment-sticker-photo-img')}</div>` : ''}
+    <h3 class="moment-sticker-title">${escapeHtml(m.title||'')}</h3>
+    <div class="moment-sticker-text">${paragraphs}</div>
+    ${m.signature ? `<div class="moment-sticker-sign">${escapeHtml(m.signature)}</div>` : ''}
+  </article>`;
+}
+
 function renderFamaAcerca(){
   return `
   <div class="panel" style="padding:28px;max-width:640px;">
@@ -3213,6 +3280,51 @@ function renderAdmin(){
       <button class="btn-mini-clear" id="musicUrlClearBtn" style="margin-top:10px;">Quitar música</button>
     </div>
 
+    <div class="admin-box" style="grid-column:1/-1;">
+      <h3>Momentos Históricos</h3>
+      <p>Subí una imagen, un título y el relato. Se agrega como una "pegatina" nueva arriba del feed en Salón de Fama → Momentos Históricos, en vivo para todos.</p>
+
+      <div class="field">
+        <label class="mini-label">Título</label>
+        <input type="text" id="momentTitleInput" maxlength="80" placeholder="Ej: Congo llegó a octavos">
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Relato (un párrafo por línea)</label>
+        <textarea id="momentTextInput" maxlength="4000" rows="8" placeholder="Contá la historia..."></textarea>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Firma (opcional, va al pie de la pegatina)</label>
+        <input type="text" id="momentSignInput" maxlength="120" placeholder="Ej: Gracias Elavic, por ponernos en la historia.">
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Imagen</label>
+        <div class="branding-logo-row">
+          <label class="upload-btn" for="momentImageFileInput"><span id="momentImageLabel">Subir imagen</span></label>
+          <input type="file" id="momentImageFileInput" accept="image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="momentImageClearBtn" style="display:none;">Quitar imagen</button>
+        </div>
+        <div class="hint">Recomendado: menor a 1.5MB (se sincroniza en vivo para todos).</div>
+        <div class="field" style="margin-top:8px;">
+          <label class="mini-label">…o pegá una ruta de assets/ (si ya subiste el archivo al repo)</label>
+          <input type="text" id="momentImagePathInput" maxlength="200" placeholder="Ej: assets/elavic.png">
+        </div>
+      </div>
+
+      <button class="btn-primary" id="momentAddBtn" style="margin-top:6px;">Agregar momento</button>
+      <div class="hint" id="momentAddHint"></div>
+
+      <div class="moments-admin-list" id="momentsAdminList" style="margin-top:18px;">
+        ${(STATE.moments||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map(m=>`
+          <div class="moments-admin-item">
+            <span class="moments-admin-item-title">${escapeHtml(m.title||'(sin título)')}</span>
+            <button class="btn-mini-clear" data-momentdel="${m.id}">Eliminar</button>
+          </div>`).join('') || '<div class="hint">Todavía no hay momentos cargados.</div>'}
+      </div>
+    </div>
+
     <div class="admin-box">
       <h3>Bloquear edición</h3>
       <p>Volver a Modo TV: solo lectura, sin poder tocar resultados.</p>
@@ -3262,6 +3374,7 @@ function attachAdminEvents(){
   attachBrandingEvents();
   attachMusicAdminEvents();
   attachGrantAchievementEvents();
+  attachMomentsAdminEvents();
 }
 
 function attachGrantAchievementEvents(){
@@ -3451,6 +3564,73 @@ function refreshBrandingPreview(){
   const preview = document.getElementById('brandLogoPreview');
   const b = STATE.branding || defaultBranding();
   if(preview && !b.logoImage) preview.textContent = b.logoEmoji || '❄';
+}
+
+/* ---------------- Momentos Históricos — eventos del admin ---------------- */
+let pendingMomentImage = null; // dataURL de la imagen recién subida, antes de "Agregar momento"
+
+function attachMomentsAdminEvents(){
+  pendingMomentImage = null;
+
+  const fileInput = document.getElementById('momentImageFileInput');
+  if(fileInput) fileInput.addEventListener('change', (e)=>{
+    readImageFileMax(e.target.files[0], 1.5, (dataUrl)=>{
+      pendingMomentImage = dataUrl;
+      const label = document.getElementById('momentImageLabel');
+      if(label) label.textContent = 'Imagen lista ✓';
+      const clearBtn = document.getElementById('momentImageClearBtn');
+      if(clearBtn) clearBtn.style.display = '';
+      const pathInput = document.getElementById('momentImagePathInput');
+      if(pathInput) pathInput.value = ''; // la imagen subida tiene prioridad sobre la ruta
+    });
+  });
+
+  const clearBtn = document.getElementById('momentImageClearBtn');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{
+    pendingMomentImage = null;
+    const label = document.getElementById('momentImageLabel');
+    if(label) label.textContent = 'Subir imagen';
+    clearBtn.style.display = 'none';
+    if(fileInput) fileInput.value = '';
+  });
+
+  const addBtn = document.getElementById('momentAddBtn');
+  if(addBtn) addBtn.addEventListener('click', ()=>{
+    const hint = document.getElementById('momentAddHint');
+    const title = (document.getElementById('momentTitleInput').value||'').trim();
+    const text = (document.getElementById('momentTextInput').value||'').trim();
+    const signature = (document.getElementById('momentSignInput').value||'').trim();
+    const imagePath = (document.getElementById('momentImagePathInput').value||'').trim();
+
+    if(!title || !text){
+      if(hint) hint.textContent = 'Falta el título o el relato.';
+      return;
+    }
+
+    if(!STATE.moments) STATE.moments = [];
+    STATE.moments.push({
+      id: 'momento-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      title,
+      text,
+      signature: signature || null,
+      image: pendingMomentImage || imagePath || null,
+      ts: Date.now(),
+    });
+
+    pendingMomentImage = null;
+    saveTournament();
+    render(); // re-renderiza Admin (limpia el formulario) y actualiza la lista
+  });
+
+  document.querySelectorAll('[data-momentdel]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.momentdel;
+      if(!confirm('¿Eliminar este momento histórico? No se puede deshacer.')) return;
+      STATE.moments = (STATE.moments||[]).filter(m=>m.id!==id);
+      saveTournament();
+      render();
+    });
+  });
 }
 
 function tryUnlock(){
