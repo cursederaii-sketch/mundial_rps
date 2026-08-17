@@ -1497,7 +1497,7 @@ function render(){
     case 'fama': content.innerHTML = renderFama(); attachFamaEvents(); break;
     case 'ajustes': content.innerHTML = renderAjustes(); attachAjustesEvents(); break;
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
-    case 'momentos': content.innerHTML = renderMomentos(); break;
+    case 'momentos': content.innerHTML = renderMomentos(); attachMomentosEvents(); break;
     default: content.innerHTML = renderInicio();
   }
   /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
@@ -2857,7 +2857,7 @@ function renderMomentSticker(m, i){
   const tilt = (i % 2 === 0) ? '-1.3deg' : '1.5deg';
   const paragraphs = (m.text||'').split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
   return `
-  <article class="moment-sticker" style="--tilt:${tilt};">
+  <article class="moment-sticker" style="--tilt:${tilt};" data-moment-id="${escapeHtml(m.id||'')}">
     <span class="moment-sticker-pin">📌</span>
     ${m.image ? `<div class="moment-sticker-photo">${assetImg(m.image, escapeHtml(m.title||'Momento histórico'),'moment-sticker-photo-img')}</div>` : ''}
     <h3 class="moment-sticker-title">${escapeHtml(m.title||'')}</h3>
@@ -2865,6 +2865,31 @@ function renderMomentSticker(m, i){
     ${m.signature ? `<div class="moment-sticker-sign">${escapeHtml(m.signature)}</div>` : ''}
   </article>`;
 }
+
+/* Al hacer click en una pegatina se abre el modal con la imagen completa
+   (sin recortar) y el relato entero, sin el clamp de 4 líneas del feed. */
+function attachMomentosEvents(){
+  content.querySelectorAll('.moment-sticker[data-moment-id]').forEach(el=>{
+    el.addEventListener('click', ()=> openMomentModal(el.dataset.momentId));
+  });
+}
+
+function openMomentModal(id){
+  const m = (STATE.moments||[]).find(x=> String(x.id)===String(id));
+  if(!m) return;
+  const photo = document.getElementById('momentModalPhoto');
+  photo.style.backgroundImage = m.image ? `url("${m.image}")` : '';
+  photo.innerHTML = '';
+  document.getElementById('momentModalTitle').textContent = m.title || '';
+  const paragraphs = (m.text||'').split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
+  document.getElementById('momentModalText').innerHTML = paragraphs;
+  const sign = document.getElementById('momentModalSign');
+  sign.textContent = m.signature || '';
+  sign.style.display = m.signature ? '' : 'none';
+  document.getElementById('momentModal').classList.add('open');
+}
+document.getElementById('closeMomentModal').addEventListener('click', ()=> document.getElementById('momentModal').classList.remove('open'));
+document.getElementById('momentModal').addEventListener('click', (e)=>{ if(e.target.id==='momentModal') document.getElementById('momentModal').classList.remove('open'); });
 
 function renderFamaAcerca(){
   return `
