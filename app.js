@@ -278,6 +278,45 @@ const HISTORY = [
         ['Argentina',4,'Costa Rica',2], ['Colombia',7,'Cabo Verde',5],
       ],
     }},
+  {year:2046, champion:'Argentina', runnerUp:'Australia', finalScore:[4,2], third:'Marruecos', fourth:'Grecia', thirdScore:[6,5],
+    balon:null, goleador:null, fairplay:null,
+    group:{label:'GRUPO K', teams:[
+      {name:'Uruguay', pj:3,g:2,e:1,p:0,gf:6,gc:2,pts:7},
+      {name:'Argentina', pj:3,g:2,e:0,p:1,gf:5,gc:3,pts:6},
+      {name:'El Salvador', pj:3,g:1,e:1,p:1,gf:5,gc:3,pts:4},
+      {name:'España', pj:3,g:0,e:0,p:3,gf:0,gc:8,pts:0},
+    ]},
+    /* Primer Mundial de 48 equipos / 32 en el cuadro (12 grupos, clasifican
+       los 2 primeros de cada grupo + los 8 mejores terceros). Cuadro
+       completo tal cual se jugó, reconstruido partido a partido:
+       Argentina fue Panamá -> Inglaterra -> Japón -> Grecia (3-0 en semis)
+       y venció a Australia 4-2 en la final. Marruecos le ganó el tercer
+       puesto a Grecia 6-5. */
+    bracket:{
+      r32:[
+        ['Bolivia',1,'Egipto',3], ['Haití',5,'México',3],
+        ['Marruecos',3,'Brasil',1], ['Serbia',1,'Georgia',0],
+        ['Islas Vírgenes Británicas',1,'Australia',3], ['Colombia',1,'Congo',3],
+        ['Ghana',5,'El Salvador',3], ['Croacia',0,'Sudáfrica',2],
+        ['Inglaterra',4,'Polonia',2], ['Argentina',4,'Panamá',2],
+        ['Trinidad y Tobago',3,'Bosnia y Herzegovina',1], ['Japón',4,'Paraguay',3],
+        ['Perú',3,'Cabo Verde',0], ['Países Bajos',3,'Canadá',0],
+        ['Uruguay',3,'Italia',5], ['Nueva Zelanda',3,'Grecia',5],
+      ],
+      r16:[
+        ['Egipto',4,'Haití',3], ['Marruecos',2,'Serbia',0],
+        ['Australia',2,'Congo',0], ['Ghana',4,'Sudáfrica',2],
+        ['Inglaterra',2,'Argentina',4], ['Trinidad y Tobago',0,'Japón',2],
+        ['Perú',2,'Italia',4], ['Países Bajos',0,'Grecia',2],
+      ],
+      qf:[
+        ['Egipto',2,'Marruecos',4], ['Australia',3,'Ghana',1],
+        ['Argentina',5,'Japón',3], ['Italia',2,'Grecia',4],
+      ],
+      sf:[
+        ['Marruecos',2,'Australia',4], ['Argentina',3,'Grecia',0],
+      ],
+    }},
 ];
 
 /* Identidad visual del Mundial (título, subtítulo, logo y fondo).
@@ -1498,6 +1537,7 @@ function render(){
     case 'ajustes': content.innerHTML = renderAjustes(); attachAjustesEvents(); break;
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
     case 'momentos': content.innerHTML = renderMomentos(); attachMomentosEvents(); break;
+    case 'album': content.innerHTML = renderAlbumMundial(); attachAlbumEvents(); break;
     default: content.innerHTML = renderInicio();
   }
   /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
@@ -2434,7 +2474,7 @@ function currentChampionEntry(){
     }
   }
   return {
-    year:2042, champion:teamName(champCode), runnerUp:teamName(runnerCode),
+    year:2046, champion:teamName(champCode), runnerUp:teamName(runnerCode),
     finalScore: hs>as?[hs,as]:[as,hs], third, fourth, thirdScore,
     balon:null, goleador:null, fairplay:null, current:true, isLive:true,
   };
@@ -2449,8 +2489,8 @@ function allHallEntries(){
   return current ? [...HISTORY, current] : HISTORY;
 }
 
-/* Every champion has taken part in all 5 World Cups held so far (6 once
-   2042 is added). Germany is the one exception — missed one edition. */
+/* Every champion has taken part in all 7 World Cups held so far (2022
+   through 2046). Germany is the one exception — missed one edition. */
 const PARTICIPATION_OVERRIDES = { 'Alemania': 4 };
 
 function countryStats(name){
@@ -2890,6 +2930,65 @@ function openMomentModal(id){
 }
 document.getElementById('closeMomentModal').addEventListener('click', ()=> document.getElementById('momentModal').classList.remove('open'));
 document.getElementById('momentModal').addEventListener('click', (e)=>{ if(e.target.id==='momentModal') document.getElementById('momentModal').classList.remove('open'); });
+
+/* ==========================================================
+   ÁLBUM MUNDIAL 2050 — se embebe el archivo original exportado
+   (mundial-2050-album.html) tal cual, dentro de un iframe. Si por
+   algún motivo el archivo no está junto a index.html, se muestra
+   un aviso con un enlace para abrirlo directo en otra pestaña.
+   ========================================================== */
+const ALBUM_FILE = "mundial-2050-album.html";
+
+function renderAlbumMundial(){
+  return `
+  <div class="fama-hero">
+    <div class="fama-hero-trophy"><span class="fama-trophy-fallback" style="display:block;">🗂</span></div>
+    <div>
+      <h1 class="page-title" style="margin-bottom:4px;">Mundial</h1>
+      <div class="fama-hero-sub">Álbum de figuritas 2050</div>
+    </div>
+  </div>
+
+  <div class="panel album-frame-panel">
+    <iframe id="albumFrame" class="album-frame" src="${ALBUM_FILE}" title="Álbum Mundial 2050" loading="lazy"></iframe>
+    <div class="album-frame-fallback" id="albumFrameFallback" style="display:none;">
+      <div class="moments-empty-ico">🗂</div>
+      <div>No se pudo cargar <code>${ALBUM_FILE}</code> en esta vista.</div>
+      <div class="hint">Asegurate de que el archivo esté en la misma carpeta que index.html.</div>
+      <a class="btn-primary" href="${ALBUM_FILE}" target="_blank" rel="noopener" style="margin-top:14px;display:inline-block;">Abrir álbum en pestaña completa ⤢</a>
+    </div>
+  </div>
+
+  <div class="hint" style="margin-top:10px;">
+    ¿No se ve bien en esta ventana? <a href="${ALBUM_FILE}" target="_blank" rel="noopener">Abrilo en una pestaña completa ⤢</a>
+  </div>
+  `;
+}
+
+function attachAlbumEvents(){
+  const frame = document.getElementById('albumFrame');
+  const fallback = document.getElementById('albumFrameFallback');
+  if(!frame) return;
+  // Si el archivo no existe, el navegador dispara onerror en el iframe;
+  // como respaldo extra, si tras 1.5s el iframe sigue vacío también se
+  // muestra el aviso (algunos navegadores no disparan onerror para 404).
+  let resolved = false;
+  frame.addEventListener('load', ()=>{ resolved = true; });
+  frame.addEventListener('error', ()=>{
+    resolved = true;
+    frame.style.display = 'none';
+    if(fallback) fallback.style.display = 'flex';
+  });
+  setTimeout(()=>{
+    if(resolved) return;
+    try{
+      if(!frame.contentDocument || !frame.contentDocument.body || !frame.contentDocument.body.children.length){
+        frame.style.display = 'none';
+        if(fallback) fallback.style.display = 'flex';
+      }
+    }catch(e){ /* cross-origin: asumimos que cargó bien */ }
+  }, 1500);
+}
 
 function renderFamaAcerca(){
   return `
