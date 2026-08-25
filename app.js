@@ -278,45 +278,6 @@ const HISTORY = [
         ['Argentina',4,'Costa Rica',2], ['Colombia',7,'Cabo Verde',5],
       ],
     }},
-  {year:2046, champion:'Argentina', runnerUp:'Australia', finalScore:[4,2], third:'Marruecos', fourth:'Grecia', thirdScore:[6,5],
-    balon:null, goleador:null, fairplay:null,
-    group:{label:'GRUPO K', teams:[
-      {name:'Uruguay', pj:3,g:2,e:1,p:0,gf:6,gc:2,pts:7},
-      {name:'Argentina', pj:3,g:2,e:0,p:1,gf:5,gc:3,pts:6},
-      {name:'El Salvador', pj:3,g:1,e:1,p:1,gf:5,gc:3,pts:4},
-      {name:'España', pj:3,g:0,e:0,p:3,gf:0,gc:8,pts:0},
-    ]},
-    /* Primer Mundial de 48 equipos / 32 en el cuadro (12 grupos, clasifican
-       los 2 primeros de cada grupo + los 8 mejores terceros). Cuadro
-       completo tal cual se jugó, reconstruido partido a partido:
-       Argentina fue Panamá -> Inglaterra -> Japón -> Grecia (3-0 en semis)
-       y venció a Australia 4-2 en la final. Marruecos le ganó el tercer
-       puesto a Grecia 6-5. */
-    bracket:{
-      r32:[
-        ['Bolivia',1,'Egipto',3], ['Haití',5,'México',3],
-        ['Marruecos',3,'Brasil',1], ['Serbia',1,'Georgia',0],
-        ['Islas Vírgenes Británicas',1,'Australia',3], ['Colombia',1,'Congo',3],
-        ['Ghana',5,'El Salvador',3], ['Croacia',0,'Sudáfrica',2],
-        ['Inglaterra',4,'Polonia',2], ['Argentina',4,'Panamá',2],
-        ['Trinidad y Tobago',3,'Bosnia y Herzegovina',1], ['Japón',4,'Paraguay',3],
-        ['Perú',3,'Cabo Verde',0], ['Países Bajos',3,'Canadá',0],
-        ['Uruguay',3,'Italia',5], ['Nueva Zelanda',3,'Grecia',5],
-      ],
-      r16:[
-        ['Egipto',4,'Haití',3], ['Marruecos',2,'Serbia',0],
-        ['Australia',2,'Congo',0], ['Ghana',4,'Sudáfrica',2],
-        ['Inglaterra',2,'Argentina',4], ['Trinidad y Tobago',0,'Japón',2],
-        ['Perú',2,'Italia',4], ['Países Bajos',0,'Grecia',2],
-      ],
-      qf:[
-        ['Egipto',2,'Marruecos',4], ['Australia',3,'Ghana',1],
-        ['Argentina',5,'Japón',3], ['Italia',2,'Grecia',4],
-      ],
-      sf:[
-        ['Marruecos',2,'Australia',4], ['Argentina',3,'Grecia',0],
-      ],
-    }},
 ];
 
 /* Identidad visual del Mundial (título, subtítulo, logo y fondo).
@@ -344,30 +305,6 @@ function defaultBranding(){
    que el botón 🎵 de la topbar aparece para todos apenas se guarda. */
 function defaultMusic(){
   return { youtubeUrl: null };
-}
-
-/* Momentos Históricos: "pegatinas" con foto + relato que el admin va
-   sumando desde Admin / TV. Se muestran en Salón de Fama → Momentos
-   Históricos, apiladas de arriba hacia abajo (la más nueva primero), y
-   se sincronizan en vivo por Firebase igual que branding/música. La
-   imagen puede ser una ruta local (ej: "assets/elavic.png", subida a
-   mano al repo) o una imagen subida desde el admin (se guarda en base64). */
-function defaultMoments(){
-  return [
-    {
-      id: 'momento-congo-2046',
-      title: 'Congo llegó a octavos',
-      image: 'assets/elavic.png',
-      text:
-`El silencio invadió todas las casas de Kinshasa. Pero no era el mismo silencio de antes.
-Sobre el campo del Estadio Azteca, los jugadores de Congo estaban tirados sobre el césped, con las manos en la cabeza, mirando el cielo de México. No era una imagen de fracaso. Era la imagen de quien lo dio todo y se quedó a un paso. Nunca antes se había visto una imagen tan desoladora y tan orgullosa a la vez sobre un campo de fútbol. En sus ojos no había vergüenza, había agotamiento y una tristeza infinita, la de saber que el sueño se terminaba ahí. Había sido el pitido final de los octavos de final. Australia había ganado 2 a 0. Y con ese gol, se terminaba el Mundial 2046 para Congo.
-Pero nadie en ese estadio iba a olvidar cómo habían llegado hasta ahí. En los dieciseisavos de final, Congo había hecho lo imposible. Había goleado 3 a 1 a Colombia, el primer campeón del mundo y actual subcampeón. El equipo de las estrellas, el favorito de todos. Nadie les daba una oportunidad. Pero Elavic los había preparado para eso. Durante toda la fase de grupos les había repetido que no estaban ahí para participar, que estaban para competir. Y esa tarde, su Congo vertical, rápido, sin miedo, destrozó a un gigante. Fue una victoria que retumbó en todo el planeta.
-Por eso dolía tanto esta derrota. Porque por primera vez, Congo no perdía como víctima. Perdió como equipo grande, como quien ya pertenece. Al borde del campo, Elavic, El DT, no se movió. Con los brazos en jarra, miraba a sus jugadores en el suelo. No los retó. Los dejó llorar. Sabía que esas lágrimas no eran de derrota, eran de historia. A su alrededor, los australianos celebraban su pase a cuartos, pero todas las cámaras apuntaban a la camiseta celeste.
-Aquella imagen, la del Congo eliminado pero de pie, se convertiría en una de las más recordadas del Mundial de México 2046. No por la derrota, sino porque mostraba la esencia misma del fútbol: que a veces se pierde, pero se pierde después de haber ganado todo. Congo no se fue en octavos. Congo llegó a octavos.`,
-      signature: 'Gracias Elavic, por ponernos en la historia. Mundial 2046.',
-      ts: Date.now(),
-    },
-  ];
 }
 
 /* Acepta watch?v=, youtu.be/, embed/ y shorts/ y devuelve solo el ID del
@@ -406,7 +343,6 @@ function defaultState(format){
     awards:{fairplay:'', goleador:''},
     branding: defaultBranding(),
     music: defaultMusic(),
-    moments: defaultMoments(),
     format,
     matches,
     knockout: buildEmptyKnockout(format),
@@ -574,7 +510,6 @@ function initFirebaseSync(){
     if(remote.format) STATE.format = remote.format;
     if(remote.branding) STATE.branding = remote.branding;
     if(remote.music) STATE.music = remote.music;
-    if(remote.moments) STATE.moments = remote.moments;
     normalizeScores(STATE);
     autoFillKnockoutFromGroups();
     try{ localStorage.setItem('mundial2042_state_v1', JSON.stringify(STATE)); }catch(e){}
@@ -602,7 +537,7 @@ function syncToFirebase(){
   clearTimeout(syncTimer);
   // small debounce so rapid score typing doesn't spam the DB
   syncTimer = setTimeout(()=>{
-    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding(), music: STATE.music||defaultMusic(), moments: STATE.moments||defaultMoments() }).then(()=>{
+    fbRef.update({ matches: STATE.matches, knockout: STATE.knockout, teamData: TEAM_DATA, groupLetters: GROUP_LETTERS, format: STATE.format||32, branding: STATE.branding||defaultBranding(), music: STATE.music||defaultMusic() }).then(()=>{
       pendingPush = false;
     }).catch(()=>{
       setLiveStatus(false, 'Error de sync');
@@ -1536,8 +1471,6 @@ function render(){
     case 'fama': content.innerHTML = renderFama(); attachFamaEvents(); break;
     case 'ajustes': content.innerHTML = renderAjustes(); attachAjustesEvents(); break;
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
-    case 'momentos': content.innerHTML = renderMomentos(); attachMomentosEvents(); break;
-    case 'album': content.innerHTML = renderAlbumMundial(); attachAlbumEvents(); break;
     default: content.innerHTML = renderInicio();
   }
   /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
@@ -2008,69 +1941,66 @@ function computeThirdPlaceRanking(){
     });
 }
 
-/* ============================================================
-   CUADRO DEL TORNEO (12 grupos A-L). El árbol de dieciseisavos
-   (R32_FIXED_BRACKET, más abajo) es fijo. Los 8 cruces con "mejor
-   tercero" NO dependen de qué combinación de grupos clasificó —
-   cada anfitrión tiene asignado un puesto fijo del ranking de los 8
-   mejores terceros (1.º al 8.º por puntos, luego DG, luego GF), sin
-   importar de qué grupo venga ese tercero.
-   ============================================================ */
-
-/* Para cada grupo "anfitrión" (A, B, D, E, G, I, K, L), qué puesto del
-   ranking de mejores terceros le toca enfrentar (1 = el mejor tercero
-   de todos, 8 = el peor de los 8 que clasificaron). */
-const HOST_THIRD_RANK = { A:3, B:7, D:4, E:5, G:6, I:8, K:1, L:2 };
-
-/* bestThirds: array de 8 {group, team}, YA ordenado de mejor a peor
-   (computeThirdPlaceRanking().slice(0,8)). Devuelve, para cada
-   anfitrión, la letra de grupo del tercero que le toca según
-   HOST_THIRD_RANK (independiente de qué grupos hayan clasificado). */
-function thirdAssignmentFor(bestThirds){
-  if(!bestThirds || bestThirds.length < 8) return null;
-  const assign = {};
-  Object.keys(HOST_THIRD_RANK).forEach(host=>{
-    const rank = HOST_THIRD_RANK[host]; // 1..8
-    assign[host] = bestThirds[rank-1].group;
-  });
-  return assign;
+/* Evita, en la medida de lo posible, que dos equipos del mismo grupo se
+   crucen ya en dieciseisavos. No es un sorteo oficial FIFA (esa tabla de
+   cruces es enorme); es un armado determinístico (misma semilla → mismo
+   resultado siempre) con esa única restricción. */
+function avoidSameGroupPairs(list, rng){
+  const arr = list.slice();
+  for(let i=0; i<arr.length; i+=2){
+    let guard = 0;
+    while(guard < 20 && teamGroupOf(arr[i]) === teamGroupOf(arr[i+1])){
+      const j = Math.floor(rng()*arr.length);
+      if(j!==i+1 && j!==i){ [arr[i+1], arr[j]] = [arr[j], arr[i+1]]; }
+      guard++;
+    }
+  }
+  return arr;
 }
 
-/* Los 16 cruces de dieciseisavos, en el orden Llave Izquierda (8) +
-   Llave Derecha (8) tal como los pediste. Leído de a pares consecutivos
-   arma octavos/cuartos/semis vía propagateBracket().
-   t:'W'  -> campeón de ese grupo
-   t:'RU' -> segundo de ese grupo
-   t:'TH' -> mejor tercero asignado a ese grupo "anfitrión" (según
-             HOST_THIRD_RANK, más arriba) */
-const R32_FIXED_BRACKET = [
-  // ---- Llave Izquierda ----
-  {home:{t:'RU', g:'A'}, away:{t:'RU', g:'B'}},  // Bolivia vs Egipto
-  {home:{t:'W', g:'E'}, away:{t:'TH', h:'E'}},   // Haití vs (5º Tercero)
-  {home:{t:'W', g:'F'}, away:{t:'RU', g:'C'}},   // Marruecos vs Brasil
-  {home:{t:'W', g:'I'}, away:{t:'TH', h:'I'}},   // Serbia vs (8º Tercero)
-  {home:{t:'RU', g:'E'}, away:{t:'RU', g:'I'}},  // Islas Vírgenes vs Australia
-  {home:{t:'W', g:'A'}, away:{t:'TH', h:'A'}},   // Colombia vs (3º Tercero)
-  {home:{t:'W', g:'L'}, away:{t:'TH', h:'L'}},   // Ghana vs (2º Tercero)
-  {home:{t:'W', g:'D'}, away:{t:'TH', h:'D'}},   // Croacia vs (4º Tercero)
-  // ---- Llave Derecha ----
-  {home:{t:'W', g:'G'}, away:{t:'TH', h:'G'}},   // Inglaterra vs (6º Tercero)
-  {home:{t:'RU', g:'K'}, away:{t:'RU', g:'L'}},  // Argentina vs Panamá
-  {home:{t:'W', g:'H'}, away:{t:'RU', g:'J'}},   // Trinidad y Tobago vs Bosnia y Herzegovina
-  {home:{t:'W', g:'B'}, away:{t:'TH', h:'B'}},   // Japón vs (7º Tercero)
-  {home:{t:'W', g:'J'}, away:{t:'RU', g:'G'}},   // Perú vs Cabo Verde
-  {home:{t:'W', g:'K'}, away:{t:'TH', h:'K'}},   // Uruguay vs (1º Tercero)
-  {home:{t:'RU', g:'D'}, away:{t:'RU', g:'F'}},  // Países Bajos vs Canadá
-  {home:{t:'W', g:'C'}, away:{t:'RU', g:'H'}},   // Nueva Zelanda vs Grecia
-];
+/* Grupos cuyo primer puesto enfrenta a un "mejor tercero" en dieciseisavos
+   (esquema real del Mundial 2026 de 48 equipos). Los primeros de los otros
+   4 grupos (C, F, H, J) enfrentan a un segundo puesto. La tabla oficial de
+   la FIFA tiene 495 combinaciones posibles para asignar qué tercero le
+   toca a cada uno de estos 8 primeros; acá usamos un criterio propio más
+   simple (aleatorio, evitando que un equipo enfrente a otro de su propio
+   grupo) en vez de replicar esa tabla completa. */
+const THIRD_PLACE_HOST_GROUPS = ['A','B','D','E','G','I','K','L'];
 
-function resolveSlot(slot, winners, runnersup, thirdTeamByGroup, thirdAssign){
-  if(slot.t === 'W') return winners[slot.g] || null;
-  if(slot.t === 'RU') return runnersup[slot.g] || null;
-  // 'TH': tercero asignado a este anfitrión según la tabla oficial
-  if(!thirdAssign) return null;
-  const thirdGroup = thirdAssign[slot.h];
-  return thirdGroup ? (thirdTeamByGroup[thirdGroup] || null) : null;
+/* Arma los 16 cruces de dieciseisavos según las reglas de arriba. Como el
+   armado tiene margen aleatorio, reintenta unas cuantas veces hasta
+   conseguir una versión sin ningún cruce entre equipos del mismo grupo
+   (o se queda con el mejor intento si tiene mala suerte 40 veces seguidas,
+   algo prácticamente imposible). */
+function buildBracketMatches48(winners, runnersup, bestThirds, seed){
+  const rng = mulberry32(seed);
+  const matches = [];
+
+  const hostGroups = seededShuffle(THIRD_PLACE_HOST_GROUPS.slice(), rng);
+  const thirdsPool = seededShuffle(bestThirds.slice(), rng);
+  hostGroups.forEach(hostGroup=>{
+    let idx = thirdsPool.findIndex(t=> t.group!==hostGroup);
+    if(idx===-1) idx = 0;
+    const third = thirdsPool.splice(idx,1)[0];
+    matches.push({home: winners[hostGroup], away: third.team.code});
+  });
+
+  const otherWinnerGroups = GROUP_LETTERS.filter(g=> !THIRD_PLACE_HOST_GROUPS.includes(g));
+  const runnerUpGroupsLeft = seededShuffle(GROUP_LETTERS.slice(), rng);
+  otherWinnerGroups.forEach(wg=>{
+    let idx = runnerUpGroupsLeft.findIndex(rg=> rg!==wg);
+    if(idx===-1) idx = 0;
+    const rg = runnerUpGroupsLeft.splice(idx,1)[0];
+    matches.push({home: winners[wg], away: runnersup[rg]});
+  });
+
+  const remainingRunnerCodes = runnerUpGroupsLeft.map(g=> runnersup[g]);
+  const pairedRunners = avoidSameGroupPairs(seededShuffle(remainingRunnerCodes, rng), rng);
+  for(let i=0;i<pairedRunners.length;i+=2){
+    matches.push({home: pairedRunners[i], away: pairedRunners[i+1]});
+  }
+
+  return matches;
 }
 
 function generateBracketFromGroups48(){
@@ -2081,22 +2011,34 @@ function generateBracketFromGroups48(){
     runnersup[g] = st[1].code;
   });
   const bestThirds = computeThirdPlaceRanking().slice(0,8); // [{group, team}]
-  const thirdTeamByGroup = {};
-  bestThirds.forEach(x=>{ thirdTeamByGroup[x.group] = x.team.code; });
-  const thirdAssign = thirdAssignmentFor(bestThirds);
 
+  /* Semilla fija: para los mismos resultados de grupos (mismos winners,
+     runnersup y bestThirds), este bucle siempre recorre exactamente las
+     mismas semillas en el mismo orden y llega al mismo resultado final.
+     Nada de esto usa Math.random, así que "Generar cuadro" ya no vuelve
+     a tirar los dados — el cuadro queda fijo hasta que cambien los
+     resultados de grupos. */
+  const BRACKET_BASE_SEED = 480226;
+  let matches = null;
+  for(let attempt=0; attempt<40; attempt++){
+    const candidate = buildBracketMatches48(winners, runnersup, bestThirds, BRACKET_BASE_SEED + attempt);
+    const hasClash = candidate.some(m=> teamGroupOf(m.home)===teamGroupOf(m.away));
+    matches = candidate;
+    if(!hasClash) break;
+  }
+
+  const orderRng = mulberry32(BRACKET_BASE_SEED + 1000);
+  const shuffledMatches = seededShuffle(matches, orderRng);
   const K = buildEmptyKnockout(48);
-  R32_FIXED_BRACKET.forEach((m,i)=>{
-    K.r32[i].homeName = resolveSlot(m.home, winners, runnersup, thirdTeamByGroup, thirdAssign);
-    K.r32[i].awayName = resolveSlot(m.away, winners, runnersup, thirdTeamByGroup, thirdAssign);
+  shuffledMatches.forEach((m,i)=>{
+    K.r32[i].homeName = m.home;
+    K.r32[i].awayName = m.away;
   });
   STATE.knockout = K;
   propagateBracket();
   saveTournament();
   render();
-  if(!thirdAssign){
-    alert('No se encontró la combinación de terceros en la tabla oficial (revisá que haya exactamente 12 grupos completos). El cuadro quedó con esos cruces vacíos.');
-  }else if(!allGroupsComplete()){
+  if(!allGroupsComplete()){
     alert('Nota: algunos grupos aún no terminaron. El cuadro se armó con las posiciones actuales (incluyendo terceros) y puede cambiar.');
   }
 }
@@ -2474,7 +2416,7 @@ function currentChampionEntry(){
     }
   }
   return {
-    year:2046, champion:teamName(champCode), runnerUp:teamName(runnerCode),
+    year:2042, champion:teamName(champCode), runnerUp:teamName(runnerCode),
     finalScore: hs>as?[hs,as]:[as,hs], third, fourth, thirdScore,
     balon:null, goleador:null, fairplay:null, current:true, isLive:true,
   };
@@ -2489,8 +2431,8 @@ function allHallEntries(){
   return current ? [...HISTORY, current] : HISTORY;
 }
 
-/* Every champion has taken part in all 7 World Cups held so far (2022
-   through 2046). Germany is the one exception — missed one edition. */
+/* Every champion has taken part in all 5 World Cups held so far (6 once
+   2042 is added). Germany is the one exception — missed one edition. */
 const PARTICIPATION_OVERRIDES = { 'Alemania': 4 };
 
 function countryStats(name){
@@ -2864,130 +2806,6 @@ function renderFamaHistoria(all){
     <div class="panel-title" style="margin-bottom:16px;">Línea de tiempo</div>
     <div class="history-timeline">${items}</div>
   </div>`;
-}
-
-/* Momentos Históricos: sección propia (no vive dentro de Salón de Fama).
-   Feed vertical de "pegatinas" (foto + relato) que el admin carga desde
-   Admin / TV, listadas de arriba hacia abajo con la más reciente primero. */
-function renderMomentos(){
-  const moments = (STATE.moments||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
-  const body = moments.length ? `
-  <div class="moments-feed">
-    ${moments.map((m,i)=>renderMomentSticker(m,i)).join('')}
-  </div>` : `
-  <div class="moments-empty">
-    <div class="moments-empty-ico">📌</div>
-    <div>Todavía no hay momentos históricos cargados.</div>
-    <div class="hint">El admin puede sumar el primero desde Admin / TV.</div>
-  </div>`;
-
-  return `
-  <div class="fama-hero">
-    <div class="fama-hero-trophy"><span class="fama-trophy-fallback" style="display:block;">📌</span></div>
-    <div>
-      <h1 class="page-title" style="margin-bottom:4px;">Momentos Históricos</h1>
-      <div class="fama-hero-sub">Postales que quedaron grabadas en la memoria del Mundial</div>
-    </div>
-  </div>
-  ${body}
-  `;
-}
-
-function renderMomentSticker(m, i){
-  const tilt = (i % 2 === 0) ? '-1.3deg' : '1.5deg';
-  const paragraphs = (m.text||'').split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
-  return `
-  <article class="moment-sticker" style="--tilt:${tilt};" data-moment-id="${escapeHtml(m.id||'')}">
-    <span class="moment-sticker-pin">📌</span>
-    ${m.image ? `<div class="moment-sticker-photo">${assetImg(m.image, escapeHtml(m.title||'Momento histórico'),'moment-sticker-photo-img')}</div>` : ''}
-    <h3 class="moment-sticker-title">${escapeHtml(m.title||'')}</h3>
-    <div class="moment-sticker-text">${paragraphs}</div>
-    ${m.signature ? `<div class="moment-sticker-sign">${escapeHtml(m.signature)}</div>` : ''}
-  </article>`;
-}
-
-/* Al hacer click en una pegatina se abre el modal con la imagen completa
-   (sin recortar) y el relato entero, sin el clamp de 4 líneas del feed. */
-function attachMomentosEvents(){
-  content.querySelectorAll('.moment-sticker[data-moment-id]').forEach(el=>{
-    el.addEventListener('click', ()=> openMomentModal(el.dataset.momentId));
-  });
-}
-
-function openMomentModal(id){
-  const m = (STATE.moments||[]).find(x=> String(x.id)===String(id));
-  if(!m) return;
-  const photo = document.getElementById('momentModalPhoto');
-  photo.style.backgroundImage = m.image ? `url("${m.image}")` : '';
-  photo.innerHTML = '';
-  document.getElementById('momentModalTitle').textContent = m.title || '';
-  const paragraphs = (m.text||'').split('\n').map(p=>p.trim()).filter(Boolean).map(p=>`<p>${escapeHtml(p)}</p>`).join('');
-  document.getElementById('momentModalText').innerHTML = paragraphs;
-  const sign = document.getElementById('momentModalSign');
-  sign.textContent = m.signature || '';
-  sign.style.display = m.signature ? '' : 'none';
-  document.getElementById('momentModal').classList.add('open');
-}
-document.getElementById('closeMomentModal').addEventListener('click', ()=> document.getElementById('momentModal').classList.remove('open'));
-document.getElementById('momentModal').addEventListener('click', (e)=>{ if(e.target.id==='momentModal') document.getElementById('momentModal').classList.remove('open'); });
-
-/* ==========================================================
-   ÁLBUM MUNDIAL 2050 — se embebe el archivo original exportado
-   (mundial-2050-album.html) tal cual, dentro de un iframe. Si por
-   algún motivo el archivo no está junto a index.html, se muestra
-   un aviso con un enlace para abrirlo directo en otra pestaña.
-   ========================================================== */
-const ALBUM_FILE = "mundial-2050-album.html";
-
-function renderAlbumMundial(){
-  return `
-  <div class="fama-hero">
-    <div class="fama-hero-trophy"><span class="fama-trophy-fallback" style="display:block;">🗂</span></div>
-    <div>
-      <h1 class="page-title" style="margin-bottom:4px;">Mundial</h1>
-      <div class="fama-hero-sub">Álbum de figuritas 2050</div>
-    </div>
-  </div>
-
-  <div class="panel album-frame-panel">
-    <iframe id="albumFrame" class="album-frame" src="${ALBUM_FILE}" title="Álbum Mundial 2050" loading="lazy"></iframe>
-    <div class="album-frame-fallback" id="albumFrameFallback" style="display:none;">
-      <div class="moments-empty-ico">🗂</div>
-      <div>No se pudo cargar <code>${ALBUM_FILE}</code> en esta vista.</div>
-      <div class="hint">Asegurate de que el archivo esté en la misma carpeta que index.html.</div>
-      <a class="btn-primary" href="${ALBUM_FILE}" target="_blank" rel="noopener" style="margin-top:14px;display:inline-block;">Abrir álbum en pestaña completa ⤢</a>
-    </div>
-  </div>
-
-  <div class="hint" style="margin-top:10px;">
-    ¿No se ve bien en esta ventana? <a href="${ALBUM_FILE}" target="_blank" rel="noopener">Abrilo en una pestaña completa ⤢</a>
-  </div>
-  `;
-}
-
-function attachAlbumEvents(){
-  const frame = document.getElementById('albumFrame');
-  const fallback = document.getElementById('albumFrameFallback');
-  if(!frame) return;
-  // Si el archivo no existe, el navegador dispara onerror en el iframe;
-  // como respaldo extra, si tras 1.5s el iframe sigue vacío también se
-  // muestra el aviso (algunos navegadores no disparan onerror para 404).
-  let resolved = false;
-  frame.addEventListener('load', ()=>{ resolved = true; });
-  frame.addEventListener('error', ()=>{
-    resolved = true;
-    frame.style.display = 'none';
-    if(fallback) fallback.style.display = 'flex';
-  });
-  setTimeout(()=>{
-    if(resolved) return;
-    try{
-      if(!frame.contentDocument || !frame.contentDocument.body || !frame.contentDocument.body.children.length){
-        frame.style.display = 'none';
-        if(fallback) fallback.style.display = 'flex';
-      }
-    }catch(e){ /* cross-origin: asumimos que cargó bien */ }
-  }, 1500);
 }
 
 function renderFamaAcerca(){
@@ -3404,51 +3222,6 @@ function renderAdmin(){
       <button class="btn-mini-clear" id="musicUrlClearBtn" style="margin-top:10px;">Quitar música</button>
     </div>
 
-    <div class="admin-box" style="grid-column:1/-1;">
-      <h3>Momentos Históricos</h3>
-      <p>Subí una imagen, un título y el relato. Se agrega como una "pegatina" nueva arriba del feed en Salón de Fama → Momentos Históricos, en vivo para todos.</p>
-
-      <div class="field">
-        <label class="mini-label">Título</label>
-        <input type="text" id="momentTitleInput" maxlength="80" placeholder="Ej: Congo llegó a octavos">
-      </div>
-
-      <div class="field">
-        <label class="mini-label">Relato (un párrafo por línea)</label>
-        <textarea id="momentTextInput" maxlength="4000" rows="8" placeholder="Contá la historia..."></textarea>
-      </div>
-
-      <div class="field">
-        <label class="mini-label">Firma (opcional, va al pie de la pegatina)</label>
-        <input type="text" id="momentSignInput" maxlength="120" placeholder="Ej: Gracias Elavic, por ponernos en la historia.">
-      </div>
-
-      <div class="field">
-        <label class="mini-label">Imagen</label>
-        <div class="branding-logo-row">
-          <label class="upload-btn" for="momentImageFileInput"><span id="momentImageLabel">Subir imagen</span></label>
-          <input type="file" id="momentImageFileInput" accept="image/*" style="display:none;">
-          <button type="button" class="btn-mini-clear" id="momentImageClearBtn" style="display:none;">Quitar imagen</button>
-        </div>
-        <div class="hint">Recomendado: menor a 1.5MB (se sincroniza en vivo para todos).</div>
-        <div class="field" style="margin-top:8px;">
-          <label class="mini-label">…o pegá una ruta de assets/ (si ya subiste el archivo al repo)</label>
-          <input type="text" id="momentImagePathInput" maxlength="200" placeholder="Ej: assets/elavic.png">
-        </div>
-      </div>
-
-      <button class="btn-primary" id="momentAddBtn" style="margin-top:6px;">Agregar momento</button>
-      <div class="hint" id="momentAddHint"></div>
-
-      <div class="moments-admin-list" id="momentsAdminList" style="margin-top:18px;">
-        ${(STATE.moments||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map(m=>`
-          <div class="moments-admin-item">
-            <span class="moments-admin-item-title">${escapeHtml(m.title||'(sin título)')}</span>
-            <button class="btn-mini-clear" data-momentdel="${m.id}">Eliminar</button>
-          </div>`).join('') || '<div class="hint">Todavía no hay momentos cargados.</div>'}
-      </div>
-    </div>
-
     <div class="admin-box">
       <h3>Bloquear edición</h3>
       <p>Volver a Modo TV: solo lectura, sin poder tocar resultados.</p>
@@ -3498,7 +3271,6 @@ function attachAdminEvents(){
   attachBrandingEvents();
   attachMusicAdminEvents();
   attachGrantAchievementEvents();
-  attachMomentsAdminEvents();
 }
 
 function attachGrantAchievementEvents(){
@@ -3688,73 +3460,6 @@ function refreshBrandingPreview(){
   const preview = document.getElementById('brandLogoPreview');
   const b = STATE.branding || defaultBranding();
   if(preview && !b.logoImage) preview.textContent = b.logoEmoji || '❄';
-}
-
-/* ---------------- Momentos Históricos — eventos del admin ---------------- */
-let pendingMomentImage = null; // dataURL de la imagen recién subida, antes de "Agregar momento"
-
-function attachMomentsAdminEvents(){
-  pendingMomentImage = null;
-
-  const fileInput = document.getElementById('momentImageFileInput');
-  if(fileInput) fileInput.addEventListener('change', (e)=>{
-    readImageFileMax(e.target.files[0], 1.5, (dataUrl)=>{
-      pendingMomentImage = dataUrl;
-      const label = document.getElementById('momentImageLabel');
-      if(label) label.textContent = 'Imagen lista ✓';
-      const clearBtn = document.getElementById('momentImageClearBtn');
-      if(clearBtn) clearBtn.style.display = '';
-      const pathInput = document.getElementById('momentImagePathInput');
-      if(pathInput) pathInput.value = ''; // la imagen subida tiene prioridad sobre la ruta
-    });
-  });
-
-  const clearBtn = document.getElementById('momentImageClearBtn');
-  if(clearBtn) clearBtn.addEventListener('click', ()=>{
-    pendingMomentImage = null;
-    const label = document.getElementById('momentImageLabel');
-    if(label) label.textContent = 'Subir imagen';
-    clearBtn.style.display = 'none';
-    if(fileInput) fileInput.value = '';
-  });
-
-  const addBtn = document.getElementById('momentAddBtn');
-  if(addBtn) addBtn.addEventListener('click', ()=>{
-    const hint = document.getElementById('momentAddHint');
-    const title = (document.getElementById('momentTitleInput').value||'').trim();
-    const text = (document.getElementById('momentTextInput').value||'').trim();
-    const signature = (document.getElementById('momentSignInput').value||'').trim();
-    const imagePath = (document.getElementById('momentImagePathInput').value||'').trim();
-
-    if(!title || !text){
-      if(hint) hint.textContent = 'Falta el título o el relato.';
-      return;
-    }
-
-    if(!STATE.moments) STATE.moments = [];
-    STATE.moments.push({
-      id: 'momento-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-      title,
-      text,
-      signature: signature || null,
-      image: pendingMomentImage || imagePath || null,
-      ts: Date.now(),
-    });
-
-    pendingMomentImage = null;
-    saveTournament();
-    render(); // re-renderiza Admin (limpia el formulario) y actualiza la lista
-  });
-
-  document.querySelectorAll('[data-momentdel]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const id = btn.dataset.momentdel;
-      if(!confirm('¿Eliminar este momento histórico? No se puede deshacer.')) return;
-      STATE.moments = (STATE.moments||[]).filter(m=>m.id!==id);
-      saveTournament();
-      render();
-    });
-  });
 }
 
 function tryUnlock(){
