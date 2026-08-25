@@ -74,6 +74,9 @@
         <span class="nav-ico">⛨</span> Admin
         <span class="dot" id="adminDot"></span>
       </button>
+      <button class="nav-item" data-view="momentos">
+        <span class="nav-ico">📌</span> Momentos Históricos
+      </button>
 
       <div class="side-card">
         <div class="side-card-label">Torneo</div>
@@ -225,6 +228,19 @@
       <div class="role-badge" id="achvDetailStatus" style="margin:10px auto 16px;">🔒 Bloqueado</div>
       <div class="mini-label" style="text-align:left;">CÓMO CONSEGUIRLO</div>
       <p class="achv-detail-desc" id="achvDetailDesc"></p>
+    </div>
+  </div>
+</div>
+
+<!-- MOMENT (HISTORICAL) DETAIL MODAL -->
+<div class="modal-overlay" id="momentModal">
+  <div class="modal moment-modal">
+    <button class="modal-close" id="closeMomentModal">✕</button>
+    <div class="moment-modal-photo" id="momentModalPhoto"></div>
+    <div class="modal-body moment-modal-body">
+      <h3 class="moment-modal-title" id="momentModalTitle"></h3>
+      <div class="moment-modal-text" id="momentModalText"></div>
+      <div class="moment-sticker-sign" id="momentModalSign"></div>
     </div>
   </div>
 </div>
