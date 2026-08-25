@@ -3,249 +3,399 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vista aérea — Salud mental y deporte, zona por zona</title>
+<title>MUNDIAL 2042 · Hielo Eterno</title>
+<meta name="description" content="Mundial 2042 · Hielo Eterno — seguí la fase de grupos, el cuadro de eliminación, chateá con amigos y predecí los resultados del torneo en vivo.">
+<link rel="icon" type="image/png" href="assets/mundiales/trophy.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="pitch-bar"><div class="pitch-fill" id="pitchFill"></div></div>
-<div class="pitch-tag" id="pitchTag">ÁREA PROPIA</div>
-
-<header class="hero wrap" id="hero" data-zone="ÁREA PROPIA">
-  <div class="pitch-mark"></div>
-  <div class="hero-grid">
-    <div>
-      <p class="kicker zone-chip" style="color:var(--day-gold)">Vista aérea · Salud mental y deporte</p>
-      <h1>Una cancha,<br>zona por zona</h1>
-      <p class="lead">Visto desde arriba, el mismo campo tiene zonas que protegen y zonas de riesgo. Esta página recorre la cancha de la salud mental en el deporte, sector por sector, con fuentes reales en cada afirmación.</p>
-      <div class="hero-tags">
-        <span class="tag">ÁREA PROPIA — LO QUE CUIDA</span>
-        <span class="tag">ÁREA RIVAL — LO QUE LESIONA</span>
-      </div>
-    </div>
-    <div class="img-slot wide" data-label="images/hero.jpg — foto grande del equipo o la cancha (1600×1200 aprox.)">
-      <img src="images/hero.jpg" alt="Foto del equipo o la cancha">
-    </div>
-  </div>
-</header>
-
-<section class="primer" id="primer" data-zone="ÁREA PROPIA">
-  <div class="wrap">
-    <p class="kicker zone-chip">Zona 1 · Área propia</p>
-    <h2>Lo que el deporte cuida</h2>
-    <p class="lead">La evidencia científica sobre este punto es amplia y viene de organismos de salud, no solo de sentido común.</p>
-
-    <div class="stat-grid" style="margin-top:50px;">
-      <div class="stat-card">
-        <p class="stat-num">OMS</p>
-        <h3>Reduce ansiedad y depresión a cualquier edad</h3>
-        <p>La actividad física regular reduce los síntomas de depresión y ansiedad tanto en adultos como en niños y adolescentes, además de favorecer la salud cerebral general.<sup class="src">[1]</sup></p>
-      </div>
-      <div class="stat-card">
-        <p class="stat-num">Neuroquímica</p>
-        <h3>Libera endorfinas, serotonina y dopamina</h3>
-        <p>Durante y después del ejercicio el cerebro libera sustancias asociadas al bienestar y reduce el cortisol, la hormona del estrés — de ahí la sensación de calma después de entrenar.<sup class="src">[2]</sup></p>
-      </div>
-      <div class="stat-card">
-        <p class="stat-num">Estudio JAMA Pediatrics</p>
-        <h3>Protege a la infancia y la adolescencia</h3>
-        <p>Un estudio con casi dos millones de chicos en Taiwán, seguido durante años, mostró que el ejercicio actúa como factor de protección frente a ansiedad, depresión y TDAH.<sup class="src">[3]</sup></p>
-      </div>
-      <div class="stat-card">
-        <p class="stat-num">Efecto social</p>
-        <h3>Pertenecer a un equipo también cuida</h3>
-        <p>Más allá de la química cerebral, el deporte en grupo suma un factor de conexión social y autoestima que funciona como protección extra frente a los problemas de salud mental.<sup class="src">[1]</sup></p>
-      </div>
-      <div class="stat-card">
-        <p class="stat-num">Sueño</p>
-        <h3>Rompe el círculo de estrés e insomnio</h3>
-        <p>El ejercicio regular ayuda a conciliar el sueño más rápido y a dormir de forma más profunda, algo clave porque el mal descanso alimenta la ansiedad y la ansiedad, a su vez, empeora el sueño.<sup class="src">[10]</sup></p>
-      </div>
-      <div class="stat-card">
-        <p class="stat-num">Autoestima y mente</p>
-        <h3>Cuida la confianza y protege el cerebro con los años</h3>
-        <p>Cumplir metas físicas —una distancia, un peso, una técnica— refuerza la autoestima y la confianza personal, mientras que la actividad sostenida en el tiempo actúa como factor protector frente al deterioro cognitivo.<sup class="src">[14]</sup></p>
-      </div>
-    </div>
-
-    <div class="img-row">
-      <div class="img-slot" data-label="images/primer-1.jpg — chicos jugando o celebrando">
-        <img src="images/primer-1.jpg" alt="Jugadores celebrando">
-      </div>
-      <div class="img-slot" data-label="images/primer-2.jpg — entrenamiento en grupo">
-        <img src="images/primer-2.jpg" alt="Entrenamiento en grupo">
-      </div>
-      <div class="img-slot" data-label="images/primer-3.jpg — foto de la encuesta o del grupo del proyecto">
-        <img src="images/primer-3.jpg" alt="Grupo del proyecto">
-      </div>
-    </div>
-  </div>
-</section>
-
-<div class="mediocampo wrap" id="mediocampo" data-zone="MEDIOCAMPO">
-  <div class="pitch-mark small"></div>
-  <p class="kicker zone-chip">Mediocampo</p>
-  <h2>Cruzando la mitad de la cancha, el terreno cambia</h2>
-  <p class="lead">Todo lo anterior es real. Pero la misma actividad que protege la mente, sin límite, descanso ni acompañamiento, puede convertirse en la fuente del daño. Ahí empieza la zona rival.</p>
+<div class="aurora-bg" aria-hidden="true">
+  <span class="ribbon r1"></span>
+  <span class="ribbon r2"></span>
+  <span class="ribbon r3"></span>
+  <span class="stars"></span>
 </div>
 
-<section class="segundo" id="segundo" data-zone="ÁREA RIVAL">
-  <div class="wrap">
-    <p class="kicker zone-chip">Zona 2 · Área rival</p>
-    <h2>Lo que el deporte lesiona</h2>
-    <p class="lead">No se trata solo del entrenamiento excesivo. Cuando el cuerpo no llega a recuperarse, cuando la presión de rendir es constante o cuando una lesión frena de golpe una carrera, aparecen cuadros muy distintos entre sí —desde el sobreentrenamiento hasta los trastornos alimentarios— que están documentados clínicamente.</p>
+<div class="app">
 
-    <div class="two-col" style="margin-top:50px;">
-      <div class="stat-grid" style="grid-template-columns:1fr;">
-        <div class="stat-card night">
-          <p class="stat-num">Síndrome de sobreentrenamiento</p>
-          <h3>El cuerpo no llega a recuperarse</h3>
-          <p>Aparece cuando no hay tiempo suficiente entre sesiones de entrenamiento. Puede generar fatiga crónica, bajo rendimiento, lesiones recurrentes e incluso síntomas depresivos en los casos más severos.<sup class="src">[4]</sup></p>
-        </div>
-        <div class="stat-card night">
-          <p class="stat-num">Burnout deportivo</p>
-          <h3>Hasta 3 de cada 10 deportistas lo viven</h3>
-          <p>Distintos estudios estiman que entre el 25% y el 30% de los deportistas con sobrecarga física reportan síntomas de burnout: agotamiento, pérdida de interés y sensación de no poder más.<sup class="src">[5]</sup></p>
-        </div>
-        <div class="stat-card night">
-          <p class="stat-num">Trastornos alimentarios</p>
-          <h3>No siempre es sobre el peso, pero casi siempre está ahí</h3>
-          <p>Cerca del 59% de jóvenes deportistas de élite están insatisfechos con su cuerpo y un 11% desarrolla un trastorno alimentario diagnosticado, algo más frecuente en disciplinas donde el peso importa para competir.<sup class="src">[12]</sup></p>
-        </div>
-      </div>
-      <div class="stat-grid" style="grid-template-columns:1fr;">
-        <div class="stat-card night">
-          <p class="stat-num">Depresión y ansiedad</p>
-          <h3>4 de cada 10 atletas de élite, por debajo del radar</h3>
-          <p>Un estudio de la Universidad de Toronto sobre el equipo canadiense rumbo a Tokio 2020 encontró que el 41% cumplía criterios de depresión, ansiedad o trastorno alimentario — muy por encima del 10% estimado en población general, y muchos sin diagnóstico.<sup class="src">[11]</sup></p>
-        </div>
-        <div class="stat-card night">
-          <p class="stat-num">Lesiones e identidad</p>
-          <h3>Cuando el cuerpo se detiene, la mente también sufre</h3>
-          <p>Una lesión no solo saca a un deportista de la cancha: puede ser una experiencia traumática que golpea directamente su identidad y desencadena procesos de ansiedad y depresión durante la rehabilitación.<sup class="src">[13]</sup></p>
-        </div>
-        <div class="stat-card night">
-          <p class="stat-num">Cultura del silencio</p>
-          <h3>El estigma retrasa pedir ayuda</h3>
-          <p>El miedo a mostrarse débil frente al equipo hace que muchos jugadores, sobre todo varones, oculten pérdida de interés, irritabilidad o insomnio en lugar de hablarlo con el cuerpo técnico.<sup class="src">[6]</sup></p>
-        </div>
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" id="brandMark">❄</div>
+      <div class="brand-text">
+        <div class="brand-name" id="brandName">MUNDIAL 2042</div>
+        <div class="brand-sub" id="brandSub">HIELO ETERNO · EDICIÓN POLAR</div>
       </div>
     </div>
 
-    <div class="img-row">
-      <div class="img-slot" data-label="images/segundo-1.jpg — jugador cansado o solo en la cancha">
-        <img src="images/segundo-1.jpg" alt="Jugador agotado en la cancha">
+    <div class="device-toggle" role="tablist" aria-label="Vista de dispositivo">
+      <button class="dt-btn" data-device="mobile" id="btnMobile">Celular</button>
+      <button class="dt-btn active" data-device="desktop" id="btnDesktop">PC</button>
+    </div>
+
+    <div class="topbar-actions">
+      <span class="live-pill" id="livePill"><span class="live-dot" id="liveDot"></span><span id="liveText">Conectando…</span></span>
+      <button class="btn-ghost icon-btn" id="btnMusic" title="Música del Mundial" style="display:none;">🎵</button>
+      <button class="btn-ghost" id="btnShare">Compartir</button>
+      <button class="btn-ghost icon-btn" id="btnDownload" title="Exportar datos">⇩</button>
+      <button class="avatar-btn" id="btnAvatar" title="Perfil"><span id="avatarInitial">D</span></button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+      <button class="nav-item active" data-view="inicio">
+        <span class="nav-ico">◆</span> Inicio
+      </button>
+      <button class="nav-item" data-view="grupos">
+        <span class="nav-ico">▤</span> Fase Grupos
+      </button>
+      <button class="nav-item" data-view="cuadro">
+        <span class="nav-ico">⌘</span> Cuadro Eliminación
+      </button>
+      <button class="nav-item" data-view="fama">
+        <span class="nav-ico">★</span> Salón Fama
+      </button>
+      <button class="nav-item" data-view="ajustes">
+        <span class="nav-ico">⚙</span> Ajustes
+      </button>
+      <button class="nav-item" data-view="admin">
+        <span class="nav-ico">⛨</span> Admin
+        <span class="dot" id="adminDot"></span>
+      </button>
+
+      <div class="side-card">
+        <div class="side-card-label">Torneo</div>
+        <div class="side-card-value" id="sideProgressText">0/48 Partidos</div>
+        <div class="progress-track"><div class="progress-fill" id="sideProgressFill"></div></div>
       </div>
-      <div class="img-slot" data-label="images/segundo-2.jpg — estadio vacío o de noche">
-        <img src="images/segundo-2.jpg" alt="Estadio vacío de noche">
+    </nav>
+
+    <!-- BOTTOM NAV (mobile) -->
+    <nav class="bottomnav" id="bottomnav">
+      <button class="bn-item active" data-view="inicio"><span>◆</span>Inicio</button>
+      <button class="bn-item" data-view="grupos"><span>▤</span>Grupos</button>
+      <button class="bn-item" data-view="cuadro"><span>⌘</span>Cuadro</button>
+      <button class="bn-item" data-view="fama"><span>★</span>Fama</button>
+      <button class="bn-item" data-view="ajustes"><span>⚙</span>Ajustes</button>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="content" id="content">
+      <!-- rendered by app.js -->
+    </main>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <button class="modal-close" id="closeProfile">✕</button>
+    <div class="modal-hero" id="profileHero">
+      <div class="modal-hero-avatar" id="profileHeroAvatar"></div>
+    </div>
+    <div class="modal-body">
+      <div class="mini-label">PREVIEW EN VIVO</div>
+      <div class="preview-card">
+        <div class="preview-avatar" id="previewAvatar"></div>
+        <div>
+          <div class="preview-name"><span id="previewName">DT IPFT</span><span class="preview-pronouns" id="previewPronouns">él/he</span></div>
+          <div class="preview-desc" id="previewDesc">Estratega polar. Cazador de auroras.</div>
+          <div class="preview-follow">🏳 Sigue a <span id="previewFollows">Argentina</span></div>
+        </div>
       </div>
-      <div class="img-slot" data-label="images/segundo-3.jpg — foto relacionada a su encuesta">
-        <img src="images/segundo-3.jpg" alt="Foto relacionada a la encuesta">
+
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Foto Perfil (GIF)</label>
+          <label class="upload-btn" for="inAvatarFile">
+            <span id="avatarUploadLabel">Subir Avatar GIF</span>
+          </label>
+          <input type="file" id="inAvatarFile" accept="image/gif,image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="clearAvatar">Quitar imagen</button>
+        </div>
+        <div class="field">
+          <label class="mini-label">Banner (GIF)</label>
+          <label class="upload-btn" for="inBannerFile">
+            <span id="bannerUploadLabel">Subir Banner GIF</span>
+          </label>
+          <input type="file" id="inBannerFile" accept="image/gif,image/*" style="display:none;">
+          <button type="button" class="btn-mini-clear" id="clearBanner">Quitar imagen</button>
+        </div>
       </div>
+      <div class="hint" id="uploadHint">Formatos GIF/PNG/JPG · recomendado menor a 2MB (se guarda en este navegador).</div>
+
+      <div class="field-row" style="margin-top:16px;">
+        <div class="field">
+          <label class="mini-label">Nombre + Color</label>
+          <div class="input-with-swatch">
+            <input type="text" id="inName" maxlength="24" value="DT IPFT">
+            <input type="color" id="inColor" value="#f2c230">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Fondo Gradiente 1</label>
+          <input type="color" id="inGrad1b" value="#7c5cff" class="color-block">
+        </div>
+        <div class="field">
+          <label class="mini-label">Fondo Gradiente 2</label>
+          <input type="color" id="inGrad2b" value="#0a1931" class="color-block">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Descripción</label>
+        <textarea id="inDesc" maxlength="80" rows="2">Estratega polar. Cazador de auroras.</textarea>
+      </div>
+
+      <div class="field-row two">
+        <div class="field">
+          <label class="mini-label">Pronombres</label>
+          <input type="text" id="inPronouns" value="él/he" maxlength="12">
+        </div>
+        <div class="field">
+          <label class="mini-label">Sigues a</label>
+          <select id="inFollows"></select>
+        </div>
+      </div>
+
+      <div class="hint">🏳 La vista previa usa la bandera del equipo elegido.</div>
+
+      <div class="field-row two" style="margin-top:16px;">
+        <div class="field">
+          <label class="mini-label">Rol</label>
+          <div id="profileRoleBadge" class="role-badge">Novato</div>
+        </div>
+        <div class="field">
+          <label class="mini-label">Tu código de amigo</label>
+          <div class="my-tag-row"><span id="profileTagValue">—</span></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Logros</label>
+        <div id="achvGrid" class="achv-grid"></div>
+      </div>
+
+      <button class="btn-primary full" id="saveProfile">Guardar perfil</button>
     </div>
   </div>
-</section>
+</div>
 
-<section class="banco" id="banco" data-zone="EL BANCO">
-  <div class="wrap">
-    <p class="kicker zone-chip">El banco de suplentes</p>
-    <h2>A veces hay que salir de la cancha</h2>
-    <p class="lead">No siempre el cambio se pide por una lesión visible. A veces el jugador que sale — o el que nunca entra a un torneo — está protegiendo algo que no se ve desde la tribuna.</p>
-
-    <div class="case-box">
-      <div class="img-slot" data-label="images/bojan.jpg — foto o gráfico del caso">
-        <img src="images/bojan.jpg" alt="Bojan Krkic">
-      </div>
-      <div>
-        <span class="tag2">Caso real</span>
-        <h3>Bojan Krkic</h3>
-        <span class="role">Ex-Barcelona · debutó a los 17 años</span>
-        <p>Con apenas 17 años, Bojan Krkic rompió récords de precocidad en La Masía y llegó al primer equipo del Barcelona etiquetado, desde el primer día, como "el nuevo Messi". Esa comparación se convirtió en una presión que él mismo describió como imposible de sostener: pasó de ser anónimo a personaje público casi de un día para el otro, sin que nadie le enseñara a manejarlo.<sup class="src">[6]</sup></p>
-        <p>Los primeros síntomas llegaron a mitad de temporada: mareos constantes, dolor de cabeza y una sensación de alarma que no se iba ni descansando. Ni sus compañeros ni su entrenador lo sabían — solo su familia. El episodio más fuerte ocurrió antes de su debut con la selección española, en un amistoso ante Francia: sufrió un ataque de pánico en el vestuario y tuvo que ser atendido en camilla. Puertas afuera, el club lo explicó como una gastroenteritis.<sup class="src">[6]</sup></p>
-        <p>Meses después, cuando España lo convocó para la Eurocopa 2008 — el torneo que terminaría ganando — Bojan decidió no ir. No podía explicar en público que era por ansiedad, así que se dijo que se tomaba vacaciones. La reacción fue un linchamiento mediático e insultos de la propia afición. Se retiró en 2023, quince años después de aquel episodio, y en su libro <em>Controlar lo incontrolable</em> relató por primera vez con detalle lo que pasaba por su cabeza cada vez que salía a la cancha.<sup class="src">[6]</sup></p>
-      </div>
-      <div>
-        <p class="quote">Nadie lo sabía, ni mis compañeros ni mi entrenador, solo mi gente.</p>
-        <p class="quote" style="margin-top:22px;">No podía decir que estaba mal mentalmente. Eso no se hacía.</p>
-      </div>
+<!-- FRIEND PROFILE MODAL -->
+<div class="modal-overlay" id="friendProfileModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" id="closeFriendProfile">✕</button>
+    <div class="modal-hero" id="friendProfileHero">
+      <div class="modal-hero-avatar" id="friendProfileAvatar"><span id="fpAvatarInitial"></span></div>
+    </div>
+    <div class="modal-body">
+      <div class="preview-name" style="font-size:18px;"><span id="fpName">—</span><span class="preview-pronouns" id="fpPronouns"></span></div>
+      <div class="preview-desc" id="fpDesc" style="margin:8px 0;"></div>
+      <div class="preview-follow" id="fpFollows" style="margin-bottom:14px;"></div>
+      <div class="mini-label">CÓDIGO</div>
+      <div class="my-tag-row" id="fpTag" style="margin-bottom:14px;">—</div>
+      <div class="mini-label">ROL</div>
+      <div id="fpRole" class="role-badge">Novato</div>
     </div>
   </div>
-</section>
+</div>
 
-<section class="curiosidad" id="curiosidad" data-zone="EL CÓRNER">
-  <div class="wrap">
-    <p class="kicker zone-chip">El córner</p>
-    <h2>La tarjeta verde nació en un potrero de Medellín</h2>
-    <div class="curio-grid">
-      <div class="img-slot" data-label="images/curiosidad.jpg — foto sobre juego limpio o una tarjeta">
-        <img src="images/curiosidad.jpg" alt="Tarjeta verde de juego limpio">
-      </div>
-      <div>
-        <span class="curio-badge">DATO CURIOSO</span>
-        <p class="lead">Mucho antes de que ligas de España, Italia o Argentina la adoptaran, la tarjeta verde fue idea de Roosevelt Castro, un dirigente de fútbol amateur en Medellín, Colombia: la usaba para premiar el buen comportamiento de los chicos en las canchas de barrio, como una forma de enseñarles las reglas del juego limpio.<sup class="src">[8]</sup></p>
-        <p class="lead">Décadas después, la Federación Andaluza de España creó su propia versión en 2014, y hoy la FIFA prueba tarjetas de colores nuevas — incluida una pensada para pausar un partido por la salud de un jugador, no solo por una falta.<sup class="src">[9]</sup></p>
-        <p class="lead">Es un buen ejemplo de que el fútbol también puede inventar símbolos para premiar lo positivo, no solo para castigar — la misma idea que late detrás de hablar de salud mental en el deporte.</p>
-      </div>
+<!-- ACHIEVEMENT DETAIL MODAL -->
+<div class="modal-overlay" id="achvDetailModal">
+  <div class="modal" style="max-width:360px;">
+    <button class="modal-close" id="closeAchvDetail">✕</button>
+    <div class="modal-body" style="padding-top:30px;text-align:center;">
+      <div class="achv-detail-icon" id="achvDetailIcon">🏆</div>
+      <div class="achv-detail-name" id="achvDetailName">—</div>
+      <div class="role-badge" id="achvDetailStatus" style="margin:10px auto 16px;">🔒 Bloqueado</div>
+      <div class="mini-label" style="text-align:left;">CÓMO CONSEGUIRLO</div>
+      <p class="achv-detail-desc" id="achvDetailDesc"></p>
     </div>
   </div>
-</section>
+</div>
 
-<section class="balanza" id="vestuario" data-zone="EL VESTUARIO">
-  <div class="wrap">
-    <p class="kicker zone-chip">El vestuario</p>
-    <h2>Lo que se habla puertas adentro</h2>
-    <p class="lead">Según las mismas fuentes citadas arriba, esto es lo que separa un deporte que cuida de uno que desgasta:</p>
-    <ul class="tip-list">
-      <li>
-        <span class="tip-mark">→</span>
-        <div><h3>Descanso real entre entrenamientos</h3><p>El cuerpo necesita tiempo para recuperarse; sin eso, el mismo ejercicio que ayuda empieza a dañar.<sup class="src">[4]</sup></p></div>
-      </li>
-      <li>
-        <span class="tip-mark">→</span>
-        <div><h3>Diversificar la práctica deportiva</h3><p>No repetir siempre la misma carga ni especializarse demasiado temprano reduce el riesgo de burnout.<sup class="src">[7]</sup></p></div>
-      </li>
-      <li>
-        <span class="tip-mark">→</span>
-        <div><h3>Normalizar hablar de fatiga mental en el equipo</h3><p>Nombrar el cansancio mental como algo tan válido como una lesión física es parte de la prevención.<sup class="src">[7]</sup></p></div>
-      </li>
-      <li>
-        <span class="tip-mark">→</span>
-        <div><h3>Entrenadores que sepan administrar la carga</h3><p>Un cuerpo técnico capacitado para dosificar el entrenamiento es, según los especialistas, clave para prevenir el sobreentrenamiento.<sup class="src">[7]</sup></p></div>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<section class="fuentes" id="fuentes" data-zone="EL MARCADOR">
-  <div class="wrap">
-    <p class="kicker zone-chip">El marcador</p>
-    <h2>De dónde sale cada dato</h2>
-    <div class="src-list">
-      <div class="src-item"><span class="n">[1]</span><span>OMS — Actividad física (ficha informativa). <a href="https://www.who.int/es/news-room/fact-sheets/detail/physical-activity" target="_blank">who.int</a></span></div>
-      <div class="src-item"><span class="n">[2]</span><span>Ejercicio y mente: el hábito que combate ansiedad y depresión. <a href="https://mimorelia.com/estilo-vida/ejercicio-y-mente-el-habito-que-combate-ansiedad-y-depresion-n5586347" target="_blank">mimorelia.com</a></span></div>
-      <div class="src-item"><span class="n">[3]</span><span>Estudio en JAMA Pediatrics sobre actividad física y salud mental infantil, vía Hospital Sant Joan de Déu Barcelona. <a href="https://escolasalut.sjdhospitalbarcelona.org/es/noticias/el-ejercicio-puede-reducir-riesgo-tener-problemas-salud-mental-ansiedad-depresion-tdah" target="_blank">escolasalut.sjdhospitalbarcelona.org</a></span></div>
-      <div class="src-item"><span class="n">[4]</span><span>Clínica Universidad de Navarra — El sobreentrenamiento compromete la salud física y mental. <a href="https://noticias.cun.es/somos-actualidad/sobreentrenamiento-compromete-salud-fisica-mental" target="_blank">noticias.cun.es</a></span></div>
-      <div class="src-item"><span class="n">[5]</span><span>Qaizzen Sports — Cómo prevenir el burnout en deportistas. <a href="https://qaizzen.com/eventos-deportivos/prevencion-del-burnout/" target="_blank">qaizzen.com</a></span></div>
-      <div class="src-item"><span class="n">[6]</span><span>Entrevistas públicas de Bojan Krkic — La Opinión (The Guardian), El Debate (x2) e Infobae. <a href="https://laopinion.com/2018/05/19/bojan-krkic-exjugador-del-barcelona-tuvo-ataques-de-ansiedad-por-culpa-de-messi/" target="_blank">laopinion.com</a>, <a href="https://www.eldebate.com/deportes/futbol/20230411/bojan-krkic-desvela-proceso-ansiedad-le-llevo-renunciar-jugar-espana_107087.html" target="_blank">eldebate.com</a>, <a href="https://www.infobae.com/espana/2026/03/21/cuando-mostrar-vulnerabilidad-es-una-senal-de-debilidad-la-salud-mental-el-partido-que-el-futbol-lleva-anos-perdiendo/" target="_blank">infobae.com</a></span></div>
-      <div class="src-item"><span class="n">[7]</span><span>Premium Health Sport — Burnout y sobreentrenamiento en atletas. <a href="https://premiumhealthsport.com/blog/burnout-y-sobreentrenamiento-en-atletas/" target="_blank">premiumhealthsport.com</a></span></div>
-      <div class="src-item"><span class="n">[8]</span><span>Las 2 Orillas — La historia de la tarjeta verde en el fútbol es colombiana. <a href="https://www.las2orillas.co/la-historia-de-la-tarjeta-verde-en-el-futbol-es-colombiana/" target="_blank">las2orillas.co</a></span></div>
-      <div class="src-item"><span class="n">[9]</span><span>La Lista — Tarjeta verde: qué es, cómo funciona y cuándo se puede usar. <a href="https://la-lista.com/deportes/tarjeta-verde-que-es-como-funciona-y-cuando-se-puede-usar-en-partidos-de-futbol-asi-aplican-las-nuevas-reglas" target="_blank">la-lista.com</a></span></div>
-      <div class="src-item"><span class="n">[10]</span><span>Dr. Jordi Risco — Beneficios del ejercicio físico en la salud mental (sueño). <a href="https://jordiriscopsiquiatria.com/beneficios-del-ejercicio-fisico-salud-mental/" target="_blank">jordiriscopsiquiatria.com</a></span></div>
-      <div class="src-item"><span class="n">[11]</span><span>National Geographic — Cómo el deporte de alto rendimiento puede afectar la salud mental (estudio Poucher, U. de Toronto). <a href="https://www.nationalgeographicla.com/ciencia/2024/08/asi-es-como-el-deporte-de-alto-rendimiento-puede-afectar-la-salud-mental-el-testimonio-de-los-atletas-y-las-investigaciones-cientificas" target="_blank">nationalgeographicla.com</a></span></div>
-      <div class="src-item"><span class="n">[12]</span><span>Imhay — La batalla silenciosa de la salud mental en deportistas de élite. <a href="https://www.imhay.org/2025/10/02/la-batalla-silenciosa-de-la-salud-mental-en-deportistas-de-elite/" target="_blank">imhay.org</a></span></div>
-      <div class="src-item"><span class="n">[13]</span><span>ITA Salud Mental — Deporte y salud mental: la conexión crucial para el rendimiento (lesiones e identidad). <a href="https://itasaludmental.com/blog/link/383" target="_blank">itasaludmental.com</a></span></div>
-      <div class="src-item"><span class="n">[14]</span><span>GanaSalud — Ejercicio físico: beneficios en la salud mental y cognitiva. <a href="https://ganasalud.es/ejercicio-fisico-beneficios-en-la-salud-mental-y-cognitiva/" target="_blank">ganasalud.es</a></span></div>
+<!-- GROUP CREATE MODAL -->
+<div class="modal-overlay" id="groupModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" id="closeGroupModal">✕</button>
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="mini-label">NUEVO GRUPO</div>
+      <div class="field">
+        <label class="mini-label">Nombre del grupo</label>
+        <input type="text" id="groupNameInput" maxlength="30" placeholder="Ej: Los Rompehielos">
+      </div>
+      <div class="field">
+        <label class="mini-label">Elegí amigos</label>
+        <div id="groupMemberPicker" class="group-member-picker"></div>
+      </div>
+      <button class="btn-primary full" id="createGroupConfirmBtn">Crear grupo</button>
     </div>
   </div>
-</section>
+</div>
 
-<footer>
-  <p>Proyecto grupal · Salud mental y deporte, vista desde arriba</p>
-</footer>
+<!-- MEMBERS MODAL -->
+<div class="modal-overlay" id="membersModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" id="closeMembersModal">✕</button>
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="mini-label" id="membersModalTitle">MIEMBROS</div>
+      <div id="membersModalList" class="group-member-picker"></div>
+    </div>
+  </div>
+</div>
 
-<script src="script.js"></script>
+<!-- NEW TOURNAMENT MODAL -->
+<div class="modal-overlay" id="newTournamentModal">
+  <div class="modal" style="max-width:640px;">
+    <button class="modal-close" id="closeNewTournamentModal">✕</button>
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="mini-label">NUEVO TORNEO</div>
+
+      <div class="field">
+        <label class="mini-label">Formato</label>
+        <select id="ntFormat">
+          <option value="32">32 selecciones (8 grupos de 4)</option>
+          <option value="48" selected>48 selecciones (12 grupos de 4)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Sede/s (elegí entre 1 y 3)</label>
+        <div id="ntHostPicker" class="group-member-picker" style="max-height:160px;"></div>
+      </div>
+
+      <div class="field">
+        <label class="mini-label">Países participantes</label>
+        <div id="ntTeamPicker" class="group-member-picker" style="max-height:320px;"></div>
+      </div>
+
+      <div class="hint" id="ntSummary" style="margin:12px 0;"></div>
+
+      <button class="btn-primary full" id="ntCreateBtn" disabled>Guardar configuración</button>
+    </div>
+  </div>
+</div>
+
+<!-- SORTEO MODAL -->
+<div class="modal-overlay" id="sorteoModal">
+  <div class="modal" style="max-width:720px;">
+    <button class="modal-close" id="closeSorteoModal">✕</button>
+    <div class="modal-body" style="padding-top:24px;">
+      <div class="mini-label">SORTEO DE GRUPOS</div>
+      <div id="sorteoStatus" class="sorteo-status">Sorteando…</div>
+      <div id="sorteoGrid" class="sorteo-grid"></div>
+      <button class="btn-primary full" id="sorteoConfirmBtn" style="display:none;">Confirmar y arrancar torneo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MUSIC PANEL -->
+<div class="music-panel" id="musicPanel">
+  <div class="music-panel-header">
+    <span>🎵 Música del Mundial</span>
+    <button class="modal-close" id="musicPanelClose">✕</button>
+  </div>
+  <div class="music-panel-body" id="musicPanelBody"></div>
+</div>
+
+<!-- CHAT FAB -->
+<button class="chat-fab" id="chatFab" title="Chat">
+  <img src="chat-icon.png" alt="Chat" class="chat-fab-img">
+  <span class="chat-fab-badge" id="chatFabBadge"></span>
+</button>
+
+<!-- CHAT PANEL -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-panel-header">
+    <div class="chat-tabs">
+      <button class="chat-tab active" data-ctab="chat">Chat</button>
+      <button class="chat-tab" data-ctab="predicciones">Predicciones</button>
+    </div>
+    <div class="chat-panel-header-actions">
+      <button class="chat-panel-expand" id="chatPanelExpand" title="Agrandar">⤢</button>
+      <button class="chat-panel-close" id="chatPanelClose">✕</button>
+    </div>
+  </div>
+
+  <div class="chat-tab-content" id="ctabChat">
+    <div class="chat-body">
+      <aside class="chat-friends" id="chatFriends">
+        <div class="chat-my-tag">
+          <div class="mini-label">TU CÓDIGO</div>
+          <div class="my-tag-row"><span id="myTagValue">—</span><button class="btn-mini-clear" id="copyTag">Copiar</button></div>
+        </div>
+        <div class="add-friend-row">
+          <input type="text" id="addFriendInput" placeholder="Código (DT-4821)" maxlength="12">
+          <button class="btn-mini-clear-solid" id="addFriendBtn">＋</button>
+        </div>
+        <div id="friendRequests"></div>
+
+        <button class="channel-item global-item" id="btnGlobalChat">
+          <span class="channel-ico">🌍</span> Chat Global
+        </button>
+
+        <div class="chat-friends-section-header">
+          <div class="mini-label">GRUPOS</div>
+          <button class="btn-mini-clear-solid small" id="createGroupBtn" title="Crear grupo">＋</button>
+        </div>
+        <div id="groupList" class="friend-list"></div>
+
+        <div class="mini-label" style="margin-top:12px;">AMIGOS</div>
+        <div id="friendList" class="friend-list"></div>
+      </aside>
+      <section class="chat-main">
+        <div class="chat-empty" id="chatEmpty">Elegí un amigo para chatear.</div>
+        <div class="chat-active" id="chatActive" style="display:none;">
+          <div class="chat-active-header" id="chatActiveHeader">
+            <span class="cah-avatar" id="chatActiveAvatar"></span>
+            <span class="cah-name" id="chatActiveName"></span>
+            <button class="cah-members-btn" id="chatMembersBtn" title="Ver miembros">👥</button>
+          </div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="typing-indicator" id="typingIndicator"></div>
+          <div class="gif-panel" id="gifPanel">
+            <div class="gif-panel-search">
+              <input type="text" id="gifSearchInput" placeholder="Buscar GIF…" maxlength="60">
+              <button class="btn-mini-clear" id="gifCloseBtn">✕</button>
+            </div>
+            <div class="gif-panel-grid" id="gifPanelGrid"></div>
+          </div>
+          <div class="emoji-panel" id="emojiPanel">
+            <div class="emoji-panel-grid" id="emojiPanelGrid"></div>
+          </div>
+          <div class="chat-input-row">
+            <button class="btn-ghost icon-btn" id="chatEmojiBtn" title="Emojis">😊</button>
+            <button class="btn-ghost icon-btn" id="chatGifBtn" title="Enviar GIF">GIF</button>
+            <button class="btn-ghost icon-btn" id="chatImgBtn" title="Enviar imagen">🖼</button>
+            <input type="file" id="chatImgFile" accept="image/*" style="display:none;">
+            <input type="text" id="chatInput" maxlength="500" placeholder="Escribí un mensaje…">
+            <button class="btn-primary" id="chatSendBtn">➤</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="chat-tab-content" id="ctabPredicciones" style="display:none;">
+    <div id="predictionsList" class="predictions-list"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
