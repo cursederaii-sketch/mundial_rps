@@ -1000,6 +1000,22 @@ textarea{ resize:vertical; }
 .ipft-points-legend b{ color:var(--gold); }
 .table-scroll{ overflow-x:auto; }
 
+/* Matriz de puntos por torneo (Ranking IPFT) */
+.ipft-matrix{ width:100%; border-collapse:collapse; font-size:13px; min-width:460px; }
+.ipft-matrix th, .ipft-matrix td{ padding:9px 12px; border-bottom:1px solid var(--line); }
+.ipft-matrix th{ font-family:var(--font-display); letter-spacing:.5px; text-align:center; }
+.ipft-matrix th:first-child{ text-align:left; }
+.ipft-matrix th small{ display:block; font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-top:2px; }
+.ipft-matrix td.num{ text-align:center; font-weight:700; color:var(--ice); }
+.ipft-rowlabel{ color:var(--muted); white-space:nowrap; }
+.ipft-sep td{ background:var(--panel-2); color:var(--muted); font-family:var(--font-mono); font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+.ipft-col-mundial{ background:rgba(69,168,255,.10); }
+.ipft-col-copa{ background:rgba(51,214,159,.09); }
+.ipft-col-euro{ background:rgba(139,107,255,.12); }
+.ipft-col-fin{ background:rgba(242,194,48,.08); }
+.ipft-notes{ margin:14px 0 0; padding-left:18px; color:var(--muted); font-size:12.5px; line-height:1.6; }
+
+
 .h2h-picker-row{
   display:flex; align-items:center; gap:14px; flex-wrap:wrap;
 }

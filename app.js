@@ -2551,58 +2551,103 @@ function countryStats(name){
 }
 
 /* ---------- Ranking IPFT por puntos (TODOS los países) ----------
-   Sistema de puntos propio de la app, pensado para recompensar tanto
-   los logros grandes (títulos, finales, semis) como la participación
-   sostenida (partidos jugados). Se recalcula en vivo con cada Mundial:
-   apenas HISTORY suma una edición archivada, o el torneo en curso
-   registra resultados, el ranking se actualiza solo.
+   Sistema de puntos con ponderación por torneo. Se recalcula en vivo:
+   apenas se archiva una edición o el torneo en curso registra
+   resultados, el ranking se actualiza solo.
 
-     🏆 Campeón            +100 pts
-     🥈 Subcampeón          +60 pts
-     🥉 Tercer puesto       +40 pts
-     4️⃣ Cuarto puesto       +20 pts
-     ⛸ Llegar a Octavos    +10 pts (por cada vez)
-     ⚽ Partido jugado       +2 pts (por cada partido, cualquier fase)
+   Posición / resultado        Mundial  Copa Am.  Eurocopa  Finalissima
+                                 ×1      ×0,70     ×0,70      ×0,35
+     Campeón                    +100      +70       +70        +35
+     Subcampeón                  +60      +42       +42        +21
+     Tercer puesto               +40      +28       +28         —
+     Cuarto puesto               +20      +14       +14         —
+     Octavos de final            +10       —         —          —
+     Cuartos de final             —        +7        +7         —
+     Victoria                     +3       +2        +2         +2
+     Empate                       +1       +1        +1         +1
+     Derrota                      +0       +0        +0         +0
 
+   Los partidos jugados no suman por sí solos y las derrotas no restan.
    "Todos los países" = todo país que aparece en el roster del torneo
    actual (TEAM_DATA), en la base de selecciones (COUNTRY_DB) o en
-   cualquier resultado histórico registrado — así ningún país queda
-   afuera del ranking, aunque tenga 0 puntos. */
-const IPFT_POINTS = { titulo:100, subcampeon:60, tercero:40, cuarto:20, octavos:10, partido:2 };
+   cualquier resultado registrado — ningún país queda afuera del
+   ranking, aunque tenga 0 puntos. */
+const IPFT_POINTS = {
+  mundial:{ label:'Mundial',       mult:1,    campeon:100, sub:60, tercero:40, cuarto:20, octavos:10, cuartos:0, victoria:3, empate:1 },
+  copa:   { label:'Copa América',  mult:0.70, campeon:70,  sub:42, tercero:28, cuarto:14, octavos:0,  cuartos:7, victoria:2, empate:1 },
+  euro:   { label:'Eurocopa',      mult:0.70, campeon:70,  sub:42, tercero:28, cuarto:14, octavos:0,  cuartos:7, victoria:2, empate:1 },
+  fin:    { label:'Finalissima',   mult:0.35, campeon:35,  sub:21, tercero:0,  cuarto:0,  octavos:0,  cuartos:0, victoria:2, empate:1 },
+};
+const IPFT_TOURNAMENTS = ['mundial','copa','euro','fin'];
 
 function computeIpftRanking(){
   const stats = {};
   const ensure = (name)=>{
     if(!name || name==='???') return null;
-    if(!stats[name]) stats[name] = {name, titles:0, subs:0, thirds:0, fourths:0, octavos:0, partidos:0};
+    if(!stats[name]) stats[name] = {
+      name, titles:0, subs:0, thirds:0, fourths:0, octavos:0, cuartos:0,
+      partidos:0, wins:0, draws:0, contTitles:0, finTitles:0,
+      pts:{mundial:0, copa:0, euro:0, fin:0},
+    };
     return stats[name];
+  };
+  const P = IPFT_POINTS;
+
+  // Partido con resultado conocido (empate si hs===as).
+  const result = (tour, home, hs, away, as)=>{
+    const sh=ensure(home), sa=ensure(away);
+    if(!sh || !sa) return;
+    hs=Number(hs); as=Number(as);
+    if(!Number.isFinite(hs) || !Number.isFinite(as)) return;
+    sh.partidos++; sa.partidos++;
+    if(hs>as){ sh.wins++; sh.pts[tour]+=P[tour].victoria; }
+    else if(as>hs){ sa.wins++; sa.pts[tour]+=P[tour].victoria; }
+    else { sh.draws++; sa.draws++; sh.pts[tour]+=P[tour].empate; sa.pts[tour]+=P[tour].empate; }
+  };
+  // Partido con ganador definido (final/tercer puesto archivados, penales).
+  const decided = (tour, winner, loser)=>{
+    const sw=ensure(winner), sl=ensure(loser);
+    if(!sw || !sl) return;
+    sw.partidos++; sl.partidos++; sw.wins++; sw.pts[tour]+=P[tour].victoria;
   };
 
   // Sembramos con todos los países conocidos por la app, aunque tengan 0 puntos.
   TEAM_DATA.forEach(t=>ensure(t.name));
   COUNTRY_DB.forEach(c=>ensure(c.name));
 
+  /* ===== MUNDIAL ===== */
   const all = allHallEntries();
   all.forEach(h=>{
-    if(h.champion) ensure(h.champion).titles++;
-    if(h.runnerUp) ensure(h.runnerUp).subs++;
-    if(h.third) ensure(h.third).thirds++;
-    if(h.fourth) ensure(h.fourth).fourths++;
+    let s;
+    if(h.champion && (s=ensure(h.champion))){ s.titles++; s.pts.mundial += P.mundial.campeon; }
+    if(h.runnerUp && (s=ensure(h.runnerUp))){ s.subs++;   s.pts.mundial += P.mundial.sub; }
+    if(h.third    && (s=ensure(h.third)))   { s.thirds++; s.pts.mundial += P.mundial.tercero; }
+    if(h.fourth   && (s=ensure(h.fourth)))  { s.fourths++; s.pts.mundial += P.mundial.cuarto; }
 
-    // La final y el tercer puesto suman como partido jugado para sus 4 protagonistas.
-    if(h.champion && h.runnerUp){ ensure(h.champion).partidos++; ensure(h.runnerUp).partidos++; }
-    if(h.third && h.fourth){ ensure(h.third).partidos++; ensure(h.fourth).partidos++; }
+    // El torneo en curso cuenta sus partidos más abajo, desde STATE.
+    if(h.isLive) return;
+
+    // Final y tercer puesto archivados: ganador definido.
+    if(h.champion && h.runnerUp) decided('mundial', h.champion, h.runnerUp);
+    if(h.third && h.fourth) decided('mundial', h.third, h.fourth);
 
     if(h.group && h.group.teams){
-      h.group.teams.forEach(t=>{ const s=ensure(t.name); if(s) s.partidos += Number(t.pj)||0; });
+      h.group.teams.forEach(t=>{
+        const st=ensure(t.name); if(!st) return;
+        const g=Number(t.g)||0, e=Number(t.e)||0;
+        st.partidos += Number(t.pj)||0;
+        st.wins += g; st.draws += e;
+        st.pts.mundial += g*P.mundial.victoria + e*P.mundial.empate;
+      });
     }
     if(h.bracket){
       Object.keys(h.bracket).forEach(roundKey=>{
+        if(roundKey==='final' || roundKey==='bronze') return; // ya contados arriba
         (h.bracket[roundKey]||[]).forEach(([home,hs,away,as])=>{
-          const sh=ensure(home), sa=ensure(away);
-          if(sh) sh.partidos++;
-          if(sa) sa.partidos++;
-          if(roundKey==='r16'){ if(sh) sh.octavos++; if(sa) sa.octavos++; }
+          result('mundial', home, hs, away, as);
+          if(roundKey==='r16'){
+            [home,away].forEach(n=>{ const st=ensure(n); if(st){ st.octavos++; st.pts.mundial += P.mundial.octavos; } });
+          }
         });
       });
     }
@@ -2614,11 +2659,7 @@ function computeIpftRanking(){
   const alreadyArchived = current && HISTORY.some(h=>h.year===current.year);
   if(!alreadyArchived){
     STATE.matches.forEach(m=>{
-      if(isPlayed(m)){
-        const sh=ensure(teamName(m.home)), sa=ensure(teamName(m.away));
-        if(sh) sh.partidos++;
-        if(sa) sa.partidos++;
-      }
+      if(isPlayed(m)) result('mundial', teamName(m.home), m.hs, teamName(m.away), m.as);
     });
     const K = STATE.knockout;
     const stagesList = [
@@ -2628,22 +2669,78 @@ function computeIpftRanking(){
     stagesList.forEach(([key, list])=>{
       list.forEach(m=>{
         if(m && m.homeName && m.awayName && isPlayed(m)){
-          const sh=ensure(teamName(m.homeName)), sa=ensure(teamName(m.awayName));
-          if(sh) sh.partidos++;
-          if(sa) sa.partidos++;
-          if(key==='r16'){ if(sh) sh.octavos++; if(sa) sa.octavos++; }
+          const home=teamName(m.homeName), away=teamName(m.awayName);
+          result('mundial', home, m.hs, away, m.as);
+          if(key==='r16'){
+            [home,away].forEach(n=>{ const st=ensure(n); if(st){ st.octavos++; st.pts.mundial += P.mundial.octavos; } });
+          }
         }
       });
     });
   }
 
+  /* ===== COPA AMÉRICA y EUROCOPA ===== */
+  if(typeof REGIONAL !== 'undefined'){
+    ['copa','euro'].forEach(kind=>{
+      const R = REGIONAL[kind]; if(!R) return;
+      // Campeones ya archivados (solo se guarda el campeón y el año).
+      (R.champions||[]).forEach(c=>{
+        const s = ensure(c.champion);
+        if(s){ s.contTitles++; s.pts[kind] += P[kind].campeon; }
+      });
+      // Edición en curso (se vacía al archivar, no hay doble conteo).
+      if(R.groups && R.knockout){
+        (R.matches||[]).forEach(m=>{ if(isPlayed(m)) result(kind, m.home, m.hs, m.away, m.as); });
+        const K = R.knockout;
+        [...(K.r16||[]), ...(K.qf||[]), ...(K.sf||[]), K.final].forEach(m=>{
+          if(m && m.homeName && m.awayName && isPlayed(m)) result(kind, m.homeName, m.hs, m.awayName, m.as);
+        });
+        // Cuartos de final: +7 a cada participante.
+        (K.qf||[]).forEach(m=>{
+          if(m && m.homeName && m.awayName){
+            [m.homeName, m.awayName].forEach(n=>{ const s=ensure(n); if(s){ s.cuartos++; s.pts[kind] += P[kind].cuartos; } });
+          }
+        });
+        const champ = regChampion(R);
+        if(champ && K.final){
+          const runner = champ===K.final.homeName ? K.final.awayName : K.final.homeName;
+          const sc=ensure(champ), sr=ensure(runner);
+          if(sc){ sc.contTitles++; sc.pts[kind] += P[kind].campeon; }
+          if(sr){ sr.pts[kind] += P[kind].sub; }
+        }
+      }
+    });
+
+    /* ===== FINALISSIMA ===== */
+    const F = REGIONAL.fin;
+    if(F){
+      (F.champions||[]).forEach(c=>{
+        const sc=ensure(c.champion);
+        if(sc){ sc.finTitles++; sc.pts.fin += P.fin.campeon; }
+        if(c.runnerUp){
+          const sr=ensure(c.runnerUp);
+          if(sr) sr.pts.fin += P.fin.sub;
+          decided('fin', c.champion, c.runnerUp);
+        }
+      });
+      const m = finMatch();
+      const champ = finWinner(m);
+      if(champ){
+        const runner = champ===m.homeName ? m.awayName : m.homeName;
+        const sc=ensure(champ), sr=ensure(runner);
+        if(sc){ sc.finTitles++; sc.pts.fin += P.fin.campeon; }
+        if(sr){ sr.pts.fin += P.fin.sub; }
+        decided('fin', champ, runner);
+      }
+    }
+  }
+
   Object.values(stats).forEach(s=>{
-    s.points = s.titles*IPFT_POINTS.titulo + s.subs*IPFT_POINTS.subcampeon + s.thirds*IPFT_POINTS.tercero
-      + s.fourths*IPFT_POINTS.cuarto + s.octavos*IPFT_POINTS.octavos + s.partidos*IPFT_POINTS.partido;
+    s.points = IPFT_TOURNAMENTS.reduce((acc,k)=> acc + s.pts[k], 0);
   });
 
   return Object.values(stats).sort((a,b)=>
-    b.points-a.points || b.titles-a.titles || b.subs-a.subs || b.thirds-a.thirds || b.partidos-a.partidos || a.name.localeCompare(b.name));
+    b.points-a.points || b.titles-a.titles || b.subs-a.subs || b.thirds-a.thirds || b.wins-a.wins || b.partidos-a.partidos || a.name.localeCompare(b.name));
 }
 
 /* Optional local photos: drop files into the paths below (inside the repo)
@@ -2729,44 +2826,74 @@ function renderFamaRanking(champions, current){
   `;
 }
 
+function ipftFmt(n){ return n ? '+'+n : '—'; }
+
 function renderFamaPuntos(){
   const ranking = computeIpftRanking();
   const q = (famaNav.search||'').trim().toLowerCase();
   const filtered = q ? ranking.filter(c=>c.name.toLowerCase().includes(q)) : ranking;
+  const P = IPFT_POINTS;
+  const dash = n => n ? n : '';
 
   const rows = filtered.map((c,i)=>`
     <tr class="clickable" data-country="${c.name}">
       <td class="num">${ranking.indexOf(c)+1}</td>
       <td class="team-cell"><span class="flag">${flagByCountryName(c.name,'w40')}</span>${c.name}</td>
       <td class="num pts-cell">${c.points}</td>
+      <td class="num">${dash(c.pts.mundial)}</td>
+      <td class="num">${dash(c.pts.copa)}</td>
+      <td class="num">${dash(c.pts.euro)}</td>
+      <td class="num">${dash(c.pts.fin)}</td>
       <td class="num">${c.titles||''}</td>
       <td class="num">${c.subs||''}</td>
       <td class="num">${c.thirds||''}</td>
-      <td class="num">${c.octavos||''}</td>
+      <td class="num">${c.wins||''}</td>
+      <td class="num">${c.draws||''}</td>
       <td class="num">${c.partidos||''}</td>
     </tr>`).join('');
+
+  const fmtMult = m => '×'+String(m).replace('.',',');
+  const head = IPFT_TOURNAMENTS.map(k=>`<th class="num ipft-col-${k}">${P[k].label}<small>${fmtMult(P[k].mult)}</small></th>`).join('');
+  const line = (label, key, plain)=>`<tr><td class="ipft-rowlabel">${label}</td>${
+    IPFT_TOURNAMENTS.map(k=>`<td class="num ipft-col-${k}">${plain ? '+'+P[k][key] : ipftFmt(P[k][key])}</td>`).join('')}</tr>`;
 
   return `
   <div class="panel ipft-legend-panel">
     <div class="panel-title" style="margin-bottom:4px;">Ranking IPFT · Sistema de puntos</div>
     <div class="ranking-sub" style="margin:0 0 14px;">Se actualiza solo con cada Mundial jugado — todos los países cuentan, aunque tengan 0 puntos</div>
-    <div class="ipft-points-legend">
-      <span>🏆 Campeón <b>+${IPFT_POINTS.titulo}</b></span>
-      <span>🥈 Subcampeón <b>+${IPFT_POINTS.subcampeon}</b></span>
-      <span>🥉 Tercer puesto <b>+${IPFT_POINTS.tercero}</b></span>
-      <span>4️⃣ Cuarto puesto <b>+${IPFT_POINTS.cuarto}</b></span>
-      <span>⛸ Llegar a Octavos <b>+${IPFT_POINTS.octavos}</b> c/u</span>
-      <span>⚽ Partido jugado <b>+${IPFT_POINTS.partido}</b> c/u</span>
+    <div class="table-scroll">
+    <table class="ipft-matrix">
+      <thead><tr><th>Posición / Resultado</th>${head}</tr></thead>
+      <tbody>
+        ${line('🏆 Campeón','campeon')}
+        ${line('🥈 Subcampeón','sub')}
+        ${line('🥉 Tercer puesto','tercero')}
+        ${line('4️⃣ Cuarto puesto','cuarto')}
+        ${line('⛸ Octavos de final','octavos')}
+        ${line('🥶 Cuartos de final','cuartos')}
+        <tr class="ipft-sep"><td colspan="5">⚽ Resultados de partidos</td></tr>
+        ${line('✅ Victoria','victoria',true)}
+        ${line('➖ Empate','empate',true)}
+        <tr><td class="ipft-rowlabel">❌ Derrota</td>${IPFT_TOURNAMENTS.map(k=>`<td class="num ipft-col-${k}">+0</td>`).join('')}</tr>
+      </tbody>
+    </table>
     </div>
+    <ul class="ipft-notes">
+      <li>Mundial ×1 (mayor peso) · Copa América ×0,70 · Eurocopa ×0,70 · Finalissima ×0,35 (menor peso).</li>
+      <li>Los partidos jugados no suman puntos por sí solos; las derrotas no restan, simplemente no suman.</li>
+      <li>Títulos y posiciones pesan más; victorias y empates en partidos suman de forma complementaria. <i>El rendimiento también se cuenta.</i></li>
+    </ul>
   </div>
   <div class="panel">
     <div class="panel-head"><div class="panel-title">Ranking IPFT · Todos los países</div></div>
     <div class="table-scroll">
     <table>
       <thead><tr>
-        <th>#</th><th>País</th><th class="num">Puntos</th><th class="num">🏆</th><th class="num">🥈</th><th class="num">🥉</th><th class="num">Octavos</th><th class="num">PJ</th>
+        <th>#</th><th>País</th><th class="num">Puntos</th>
+        <th class="num" title="Puntos en Mundial">Mun.</th><th class="num" title="Puntos en Copa América">Copa</th><th class="num" title="Puntos en Eurocopa">Euro</th><th class="num" title="Puntos en Finalissima">Fin.</th>
+        <th class="num">🏆</th><th class="num">🥈</th><th class="num">🥉</th><th class="num" title="Victorias">V</th><th class="num" title="Empates">E</th><th class="num" title="Partidos jugados">PJ</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="empty-note">No se encontraron países.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="13" class="empty-note">No se encontraron países.</td></tr>'}</tbody>
     </table>
     </div>
   </div>`;
