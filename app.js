@@ -317,6 +317,44 @@ const HISTORY = [
         ['Marruecos',2,'Australia',4], ['Argentina',3,'Grecia',0],
       ],
     }},
+  {year:2054, champion:'Paraguay', runnerUp:'Inglaterra', finalScore:[3,0], third:'Francia', fourth:'Egipto', thirdScore:[3,1],
+    balon:'Thiago Benítez', goleador:'Mateo Ayala', fairplay:'Japón',
+    muroDefensivo:'Antártida (1 gol recibido en 3 partidos)', goleada:'Kazajistán 3-0 Pakistán',
+    group:{label:'GRUPO J', teams:[
+      {name:'Ecuador', pj:3,g:2,e:1,p:0,gf:6,gc:2,pts:7},
+      {name:'Bolivia', pj:3,g:1,e:1,p:1,gf:3,gc:5,pts:4},
+      {name:'Paraguay', pj:3,g:1,e:0,p:2,gf:6,gc:7,pts:3},
+      {name:'Perú', pj:3,g:1,e:0,p:2,gf:6,gc:7,pts:3},
+    ]},
+    /* Primer título de Paraguay (primera estrella). Clasificó como uno de
+       los 8 mejores terceros y fue: Bélgica -> España -> Chile -> Francia
+       (2-1 en semis) y goleó 3-0 a Inglaterra en la final. Francia se
+       quedó el tercer puesto ante Egipto (3-1). */
+    bracket:{
+      r32:[
+        ['Croacia',3,'Corea del Norte',1], ['San Marino',2,'Rusia',1],
+        ['Inglaterra',3,'Islas Vírgenes Británicas',1], ['Colombia',1,'Alemania',2],
+        ['Sudáfrica',2,'México',4], ['Ecuador',2,'Zambia',0],
+        ['Países Bajos',1,'Qatar',0], ['Egipto',3,'Japón',1],
+        ['Corea del Sur',2,'Noruega',3], ['Estados Unidos',1,'Antártida',2],
+        ['Islas Vírgenes Estadounidenses',0,'Portugal',2], ['Francia',3,'R. D. del Congo',1],
+        ['Chile',2,'Islas Malvinas',1], ['Bolivia',1,'Kazajistán',3],
+        ['Paraguay',3,'Bélgica',1], ['España',4,'Israel',2],
+      ],
+      r16:[
+        ['Croacia',4,'San Marino',2], ['Inglaterra',3,'Alemania',1],
+        ['México',4,'Ecuador',2], ['Países Bajos',1,'Egipto',2],
+        ['Noruega',1,'Antártida',2], ['Portugal',2,'Francia',3],
+        ['Chile',2,'Kazajistán',0], ['Paraguay',2,'España',1],
+      ],
+      qf:[
+        ['Croacia',1,'Inglaterra',3], ['México',3,'Egipto',5],
+        ['Antártida',1,'Francia',2], ['Chile',1,'Paraguay',2],
+      ],
+      sf:[
+        ['Inglaterra',4,'Egipto',2], ['Francia',1,'Paraguay',2],
+      ],
+    }},
 ];
 
 /* Identidad visual del Mundial (título, subtítulo, logo y fondo).
@@ -649,7 +687,7 @@ function getVisitedViews(){
   try{ return JSON.parse(localStorage.getItem('mundial2042_visited')||'[]'); }catch(e){ return []; }
 }
 function markViewVisited(view){
-  if(!view) return;
+  if(!view || view==='copa' || view==='euro') return;
   const set = new Set(getVisitedViews());
   if(set.has(view)) return;
   set.add(view);
@@ -1538,6 +1576,8 @@ function render(){
     case 'admin': content.innerHTML = renderAdmin(); attachAdminEvents(); break;
     case 'momentos': content.innerHTML = renderMomentos(); attachMomentosEvents(); break;
     case 'album': content.innerHTML = renderAlbumMundial(); attachAlbumEvents(); break;
+    case 'copa': content.innerHTML = renderRegional('copa'); attachRegionalEvents('copa'); break;
+    case 'euro': content.innerHTML = renderRegional('euro'); attachRegionalEvents('euro'); break;
     default: content.innerHTML = renderInicio();
   }
   /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
@@ -1735,7 +1775,7 @@ function buildH2HIndex(){
     if(h.champion && h.runnerUp && h.finalScore) add(h.champion, h.runnerUp, h.finalScore[0], h.finalScore[1], h.year, 'Final');
     if(h.third && h.fourth && h.thirdScore) add(h.third, h.fourth, h.thirdScore[0], h.thirdScore[1], h.year, 'Tercer puesto');
     if(h.bracket){
-      const stageLabel = {r16:'Ronda de 16', qf:'Cuartos', sf:'Semifinal'};
+      const stageLabel = {r32:'Dieciseisavos', r16:'Ronda de 16', qf:'Cuartos', sf:'Semifinal'};
       Object.keys(h.bracket).forEach(roundKey=>{
         (h.bracket[roundKey]||[]).forEach(([home,hs,away,as])=>{
           add(home, away, hs, as, h.year, stageLabel[roundKey] || roundKey);
@@ -2474,7 +2514,7 @@ function currentChampionEntry(){
     }
   }
   return {
-    year:2046, champion:teamName(champCode), runnerUp:teamName(runnerCode),
+    year:2054, champion:teamName(champCode), runnerUp:teamName(runnerCode),
     finalScore: hs>as?[hs,as]:[as,hs], third, fourth, thirdScore,
     balon:null, goleador:null, fairplay:null, current:true, isLive:true,
   };
@@ -4176,7 +4216,437 @@ function init(){
   attachNewTournamentEvents();
   render();
   initFirebaseSync();
+  initRegionalSync();
   initSocial();
+}
+
+/* =========================================================
+   COPAS CONTINENTALES — Conmebol Copa América y Eurocopa
+   Son dos secciones separadas del menú. Cada una muestra arriba el
+   póster de campeones (bandera + año + país) y abajo la fase de
+   grupos y la eliminación. Si no hay edición armada, queda vacía con
+   el botón para armarla (elegir países + sorteo de grupos).
+   Se guarda en este navegador y se sincroniza en vivo por Firebase
+   (nodo tournament/regional), igual que el torneo principal.
+   ========================================================= */
+const REGIONAL_KEY = 'mundial_regional_v1';
+const REGIONAL_META = {
+  copa:{ title:'Conmebol Copa América', short:'Copa América', posterTop:'CONMEBOL COPA AMÉRICA', size:16, groupCount:4, emoji:'🌎' },
+  euro:{ title:'Eurocopa', short:'Eurocopa', posterTop:'EUROCOPA', size:24, groupCount:6, emoji:'🇪🇺' },
+};
+const REGIONAL_ISO = {
+  'Moldavia':'md','Albania':'al','Eslovenia':'si','Rumanía':'ro','Rumania':'ro','Chequia':'cz',
+  'Países Bajos':'nl','Turquía':'tr','Suiza':'ch','Georgia':'ge','Eslovaquia':'sk','Ucrania':'ua',
+  'Inglaterra':'gb-eng','Escocia':'gb-sct','Gales':'gb-wls','Bolivia':'bo','Venezuela':'ve',
+  'Estados Unidos':'us','México':'mx','Canadá':'ca','Costa Rica':'cr','Panamá':'pa','Jamaica':'jm','Haití':'ht',
+};
+const EURO_GROUPS_DEFAULT = [
+  ['Moldavia','España','Turquía','Suiza'],
+  ['Croacia','Noruega','Albania','Rumanía'],
+  ['Alemania','Dinamarca','Bélgica','Eslovenia'],
+  ['Países Bajos','Italia','Serbia','Austria'],
+  ['Inglaterra','Suecia','Ucrania','Eslovaquia'],
+  ['Francia','Portugal','Georgia','Chequia'],
+];
+
+function regionalFlag(name, size){
+  const c = COUNTRY_DB.find(x=>x.name===name);
+  const iso = REGIONAL_ISO[name] || (c && c.iso) || isoForName(name);
+  return flagImgIso(iso, size||'w40', name);
+}
+function regLabel(name){ return name ? `<span class="inline-flag">${regionalFlag(name,'w40')}</span> ${escapeHtml(name)}` : '???'; }
+
+function regRoundRobin(letter, teams){
+  const out = [];
+  for(let i=0;i<teams.length;i++) for(let j=i+1;j<teams.length;j++){
+    out.push({id:`${letter}-${i}-${j}`, group:letter, home:teams[i], away:teams[j], hs:null, as:null});
+  }
+  return out;
+}
+function regEmptyKO(kind){
+  const mk = id => ({id, homeName:null, awayName:null, hs:null, as:null});
+  if(kind==='euro') return { r16:[1,2,3,4,5,6,7,8].map(i=>mk('R'+i)), qf:[1,2,3,4].map(i=>mk('Q'+i)), sf:[1,2].map(i=>mk('S'+i)), final:mk('F') };
+  return { qf:[1,2,3,4].map(i=>mk('Q'+i)), sf:[1,2].map(i=>mk('S'+i)), final:mk('F') };
+}
+function regDefault(){
+  const euroGroups = EURO_GROUPS_DEFAULT.map((t,i)=>({letter:String.fromCharCode(65+i), teams:t}));
+  return {
+    copa:{ champions:[{year:2056, champion:'Argentina'}], year:null, groups:null, matches:[], knockout:null },
+    euro:{ champions:[], host:'Moldavia', year:2056, groups:euroGroups,
+           matches:euroGroups.flatMap(g=>regRoundRobin(g.letter,g.teams)), knockout:regEmptyKO('euro') },
+  };
+}
+function regNormalize(r){
+  const d = regDefault();
+  r = r || {};
+  ['copa','euro'].forEach(k=>{
+    const x = r[k] = r[k] || d[k];
+    x.champions = Array.isArray(x.champions) ? x.champions : Object.values(x.champions||{});
+    x.matches = Array.isArray(x.matches) ? x.matches : Object.values(x.matches||{});
+    if(x.groups && !Array.isArray(x.groups)) x.groups = Object.values(x.groups);
+    if(x.groups) x.groups.forEach(g=>{ if(!Array.isArray(g.teams)) g.teams = Object.values(g.teams||{}); });
+    if(x.groups && !x.knockout) x.knockout = regEmptyKO(k);
+    if(!x.groups) x.knockout = null;
+  });
+  return r;
+}
+let REGIONAL = (function(){
+  try{ const raw = localStorage.getItem(REGIONAL_KEY); if(raw) return regNormalize(JSON.parse(raw)); }catch(e){}
+  return regDefault();
+})();
+
+/* ---- sync ---- */
+let regRef=null, regReady=false, regApplying=false, regTimer=null, regPending=false;
+function regPush(){
+  if(regApplying || !regRef || !regReady) return;
+  regPending = true;
+  clearTimeout(regTimer);
+  regTimer = setTimeout(()=>{
+    regRef.set(JSON.parse(JSON.stringify(REGIONAL)))
+      .catch(()=>{}).then(()=>{ regPending=false; });
+  }, 250);
+}
+function regSave(){
+  try{ localStorage.setItem(REGIONAL_KEY, JSON.stringify(REGIONAL)); }catch(e){}
+  regPush();
+}
+function initRegionalSync(){
+  if(typeof firebase==='undefined' || typeof db==='undefined') return;
+  regRef = db.ref('tournament/regional');
+  regRef.on('value', snap=>{
+    const remote = snap.val();
+    regReady = true;
+    if(!remote){ regPush(); return; }
+    if(regPending) return;
+    const next = regNormalize(remote);
+    if(JSON.stringify(next) === JSON.stringify(REGIONAL)) return;
+    regApplying = true;
+    REGIONAL = next;
+    try{ localStorage.setItem(REGIONAL_KEY, JSON.stringify(REGIONAL)); }catch(e){}
+    if(STATE.view==='copa' || STATE.view==='euro') render();
+    regApplying = false;
+  });
+}
+
+/* ---- tablas ---- */
+function regStandings(R, letter){
+  const g = R.groups.find(x=>x.letter===letter);
+  const rows = {};
+  g.teams.forEach(t=> rows[t] = {name:t, pj:0, g:0, e:0, p:0, gf:0, gc:0, pts:0});
+  R.matches.filter(m=>m.group===letter && isPlayed(m)).forEach(m=>{
+    const a=rows[m.home], b=rows[m.away], hs=Number(m.hs), as=Number(m.as);
+    if(!a||!b) return;
+    a.pj++; b.pj++; a.gf+=hs; a.gc+=as; b.gf+=as; b.gc+=hs;
+    if(hs>as){ a.g++; b.p++; a.pts+=3; }
+    else if(as>hs){ b.g++; a.p++; b.pts+=3; }
+    else { a.e++; b.e++; a.pts++; b.pts++; }
+  });
+  return Object.values(rows).sort((x,y)=> y.pts-x.pts || (y.gf-y.gc)-(x.gf-x.gc) || y.gf-x.gf || x.name.localeCompare(y.name));
+}
+function regGroupDone(R, letter){
+  const ms = R.matches.filter(m=>m.group===letter);
+  return ms.length>0 && ms.every(isPlayed);
+}
+function regAllDone(R){ return R.groups.every(g=>regGroupDone(R,g.letter)); }
+function regBestThirds(R){
+  return R.groups.map(g=>{ const t = regStandings(R,g.letter)[2]; return Object.assign({letter:g.letter}, t); })
+    .sort((x,y)=> y.pts-x.pts || (y.gf-y.gc)-(x.gf-x.gc) || y.gf-x.gf || x.name.localeCompare(y.name));
+}
+
+/* ---- eliminación ---- */
+function regRounds(K){ return [...(K.r16||[]), ...K.qf, ...K.sf, K.final]; }
+function regFindMatch(R, id){ return regRounds(R.knockout).find(m=>m.id===id); }
+function regWinner(m){
+  if(!isPlayed(m)) return null;
+  const hs=Number(m.hs), as=Number(m.as);
+  return hs>as ? m.homeName : (as>hs ? m.awayName : null);
+}
+function regPropagate(R){
+  const K = R.knockout;
+  if(K.r16){
+    [[0,1],[2,3],[4,5],[6,7]].forEach(([a,b],i)=>{ K.qf[i].homeName = regWinner(K.r16[a]); K.qf[i].awayName = regWinner(K.r16[b]); });
+  }
+  K.sf[0].homeName = regWinner(K.qf[0]); K.sf[0].awayName = regWinner(K.qf[1]);
+  K.sf[1].homeName = regWinner(K.qf[2]); K.sf[1].awayName = regWinner(K.qf[3]);
+  K.final.homeName = regWinner(K.sf[0]); K.final.awayName = regWinner(K.sf[1]);
+}
+function regChampion(R){ return R.knockout ? regWinner(R.knockout.final) : null; }
+function regPerms(arr){
+  if(arr.length<=1) return [arr];
+  const out=[]; arr.forEach((x,i)=>{ regPerms(arr.slice(0,i).concat(arr.slice(i+1))).forEach(p=>out.push([x,...p])); });
+  return out;
+}
+function regGenerateKO(kind){
+  const R = REGIONAL[kind];
+  if(!regAllDone(R)){ alert('Todavía faltan partidos de la fase de grupos.'); return; }
+  const st = {}; R.groups.forEach(g=> st[g.letter] = regStandings(R,g.letter));
+  const W = l => st[l][0].name, S = l => st[l][1].name;
+  const K = regEmptyKO(kind);
+  if(kind==='copa'){
+    const pairs = [[W('A'),S('B')],[W('C'),S('D')],[W('B'),S('A')],[W('D'),S('C')]];
+    pairs.forEach(([h,a],i)=>{ K.qf[i].homeName=h; K.qf[i].awayName=a; });
+  } else {
+    const thirds = regBestThirds(R).slice(0,4);
+    const slotGroups = ['C','B','F','E'];
+    const perm = regPerms(thirds).find(p=> p.every((t,i)=> t.letter!==slotGroups[i])) || thirds;
+    const T = i => perm[i].name;
+    const pairs = [
+      [S('A'),S('B')], [W('A'),S('C')], [W('C'),T(0)], [W('B'),T(1)],
+      [S('D'),S('E')], [W('F'),T(2)], [W('E'),T(3)], [W('D'),S('F')],
+    ];
+    pairs.forEach(([h,a],i)=>{ K.r16[i].homeName=h; K.r16[i].awayName=a; });
+  }
+  R.knockout = K;
+  regPropagate(R);
+  regSave(); render();
+}
+
+/* ---- armado (elegir países + sorteo) ---- */
+let regBuilder = { kind:null, selected:[], year:'', draw:null };
+function regPool(kind){
+  if(kind==='copa'){
+    return COUNTRY_DB.filter(c=>c.conf==='CONMEBOL' || c.conf==='CONCACAF').map(c=>c.name);
+  }
+  const names = COUNTRY_DB.filter(c=>c.conf==='UEFA').map(c=>c.name);
+  ['Moldavia','Albania','Eslovenia'].forEach(n=>{ if(!names.includes(n)) names.push(n); });
+  return names;
+}
+function regBuilderHtml(kind){
+  const M = REGIONAL_META[kind];
+  if(regBuilder.kind!==kind) regBuilder = { kind, selected:[], year:'', draw:null };
+  const pool = regPool(kind).sort((a,b)=>a.localeCompare(b));
+  const sel = regBuilder.selected;
+  if(regBuilder.draw){
+    return `<div class="panel reg-builder">
+      <div class="panel-head"><div class="panel-title">Sorteo · ${M.short}</div><span class="badge">${regBuilder.year||'—'}</span></div>
+      <div class="reg-draw-grid">${regBuilder.draw.map(g=>`
+        <div class="reg-draw-group"><div class="mini-label">Grupo ${g.letter}</div>
+          ${g.teams.map(t=>`<div class="reg-draw-team">${regLabel(t)}</div>`).join('')}
+        </div>`).join('')}</div>
+      <div class="bracket-actions">
+        <button class="btn-primary" id="regConfirmDraw">Confirmar y arrancar</button>
+        <button class="btn-secondary" id="regRedraw">Volver a sortear</button>
+        <button class="btn-secondary" id="regBackPick">Cambiar países</button>
+      </div></div>`;
+  }
+  return `<div class="panel reg-builder">
+    <div class="panel-head"><div class="panel-title">Armar ${M.short}</div><span class="badge ${sel.length===M.size?'on':''}">${sel.length}/${M.size} países</span></div>
+    <div style="padding:14px 20px;">
+      <label class="mini-label">Año de la edición</label>
+      <input type="text" id="regYear" maxlength="4" value="${escapeHtml(String(regBuilder.year))}" placeholder="Ej: 2060" style="max-width:140px;">
+      <label class="mini-label" style="margin-top:14px;">Elegí ${M.size} países (${M.groupCount} grupos de 4)</label>
+      <div class="reg-pick-grid">${pool.map(n=>`
+        <label class="reg-pick ${sel.includes(n)?'on':''}"><input type="checkbox" class="reg-pick-cb" value="${escapeHtml(n)}" ${sel.includes(n)?'checked':''}>
+          <span class="flag">${regionalFlag(n,'w40')}</span>${escapeHtml(n)}</label>`).join('')}</div>
+    </div>
+    <div class="bracket-actions">
+      <button class="btn-primary" id="regDoDraw" ${sel.length===M.size?'':'disabled'}>Sortear grupos</button>
+      <button class="btn-secondary" id="regRandomPick">Elegir al azar</button>
+      <button class="btn-secondary" id="regCancelBuild">Cancelar</button>
+    </div></div>`;
+}
+function regDrawGroups(kind){
+  const M = REGIONAL_META[kind];
+  const teams = shuffleArray(regBuilder.selected.slice());
+  return Array.from({length:M.groupCount}, (_,i)=>({ letter:String.fromCharCode(65+i), teams:teams.slice(i*4, i*4+4) }));
+}
+
+/* ---- render ---- */
+function regPosterHtml(kind){
+  const M = REGIONAL_META[kind], R = REGIONAL[kind];
+  const champs = R.champions.slice().sort((a,b)=>a.year-b.year);
+  const items = champs.map(c=>`
+    <div class="rp-item">
+      <div class="rp-flag">${regionalFlag(c.champion,'w160')}</div>
+      <div class="rp-year">${c.year}</div>
+      <div class="rp-name">${escapeHtml(c.champion)}</div>
+    </div>`).join('');
+  return `
+  <div class="champ-poster">
+    <div class="rp-head">
+      <div class="rp-trophy">${assetImg('assets/mundiales/trophy.png','Copa','rp-trophy-img')}<span class="trophy-fallback">🏆</span></div>
+      <div class="rp-title"><span>${M.posterTop}</span><b>CHAMPIONS</b></div>
+    </div>
+    ${items ? `<div class="rp-grid">${items}</div>` : `<div class="rp-empty">Todavía no hay campeones de la ${M.short}.</div>`}
+  </div>`;
+}
+function regMatchHtml(kind, m){
+  const row = side=>{
+    const name = side==='home' ? m.homeName : m.awayName;
+    const sc = side==='home' ? m.hs : m.as;
+    const oc = side==='home' ? m.as : m.hs;
+    const win = hasScore(sc) && hasScore(oc) && Number(sc)>Number(oc);
+    const edit = STATE.admin.unlocked && name;
+    return `<div class="bteam ${win?'winner':''}"><span class="tname">${regLabel(name)}</span>
+      <input class="bscore reg-kscore" type="number" min="0" max="20" data-kind="${kind}" data-match="${m.id}" data-side="${side}" value="${sc??''}" placeholder="-" ${edit?'':'disabled'}></div>`;
+  };
+  return `<div class="bmatch">${row('home')}${row('away')}</div>`;
+}
+function regBracketHtml(kind){
+  const R = REGIONAL[kind], K = R.knockout, M = REGIONAL_META[kind];
+  const col = (label, items)=>`<div class="bracket-col"><div class="bcol-label">${label}</div>${items.map(m=>regMatchHtml(kind,m)).join('')}</div>`;
+  const champ = regChampion(R);
+  const finalCol = `<div class="bracket-col bracket-col-final">
+      <div class="champion-box"><div class="champion-label">CAMPEÓN ${M.short.toUpperCase()}</div>
+        <div class="champion-name">${champ ? regLabel(champ) : '???'}</div></div>
+      <div class="bcol-label" style="margin:8px 0 0;">Final</div>
+      ${regMatchHtml(kind,K.final)}
+      <div class="trophy">${assetImg('assets/mundiales/trophy.png','Copa','trophy-img')}<span class="trophy-fallback">🏆</span></div>
+    </div>`;
+  const cols = kind==='euro'
+    ? col('Octavos',K.r16.slice(0,4)) + col('Cuartos',K.qf.slice(0,2)) + col('Semifinal',[K.sf[0]]) + finalCol +
+      col('Semifinal',[K.sf[1]]) + col('Cuartos',K.qf.slice(2,4)) + col('Octavos',K.r16.slice(4,8))
+    : col('Cuartos',K.qf.slice(0,2)) + col('Semifinal',[K.sf[0]]) + finalCol + col('Semifinal',[K.sf[1]]) + col('Cuartos',K.qf.slice(2,4));
+  const n = kind==='euro' ? 7 : 5;
+  return `<div class="bracket-wrap"><div class="bracket" style="grid-template-columns:repeat(${n},minmax(150px,1fr));min-width:${n*168}px;">${cols}</div></div>`;
+}
+function regGroupsHtml(kind){
+  const R = REGIONAL[kind], editable = STATE.admin.unlocked;
+  return R.groups.map(g=>{
+    const st = regStandings(R,g.letter), done = regGroupDone(R,g.letter);
+    const ms = R.matches.filter(m=>m.group===g.letter);
+    return `<div class="panel">
+      <div class="panel-head"><div class="panel-title">Grupo ${g.letter}</div><span class="badge ${done?'on':''}">${done?'✓ Completo':'Pendiente'}</span></div>
+      <table><thead><tr><th>Equipo</th><th class="num">PJ</th><th class="num">PG</th><th class="num">PE</th><th class="num">PP</th><th class="num">GF</th><th class="num">GC</th><th class="num">PTS</th></tr></thead>
+      <tbody>${st.map((r,i)=>`<tr class="${i<2?'qualified':''}">
+        <td class="team-cell"><span class="flag">${regionalFlag(r.name,'w40')}</span>${escapeHtml(r.name)}</td>
+        <td class="num">${r.pj}</td><td class="num">${r.g}</td><td class="num">${r.e}</td><td class="num">${r.p}</td>
+        <td class="num">${r.gf}</td><td class="num">${r.gc}</td><td class="num pts-cell">${r.pts}</td></tr>`).join('')}</tbody></table>
+      <div class="match-list">${ms.map(m=>`
+        <div class="match-row">
+          <div class="match-team"><span class="flag">${regionalFlag(m.home,'w40')}</span>${escapeHtml(m.home)}</div>
+          <div class="score-box">
+            <input class="score-input reg-gscore" type="number" min="0" max="20" data-kind="${kind}" data-id="${m.id}" data-side="hs" value="${m.hs??''}" placeholder="-" ${editable?'':'disabled'}>
+            <span class="vs-label">VS</span>
+            <input class="score-input reg-gscore" type="number" min="0" max="20" data-kind="${kind}" data-id="${m.id}" data-side="as" value="${m.as??''}" placeholder="-" ${editable?'':'disabled'}>
+          </div>
+          <div class="match-team right">${escapeHtml(m.away)}<span class="flag">${regionalFlag(m.away,'w40')}</span></div>
+        </div>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+function regThirdsHtml(kind){
+  if(kind!=='euro') return '';
+  const R = REGIONAL[kind], list = regBestThirds(R), done = regAllDone(R);
+  return `<div class="panel" style="margin-top:18px;">
+    <div class="panel-head"><div class="panel-title">Mejores terceros</div><span class="badge ${done?'on':''}">${done?'Definida':'En juego'}</span></div>
+    <table><thead><tr><th class="num">#</th><th class="num">Gr</th><th>Equipo</th><th class="num">PJ</th><th class="num">DG</th><th class="num">PTS</th><th></th></tr></thead>
+    <tbody>${list.map((t,i)=>`<tr class="${i<4?'qualified':''}"><td class="num">${i+1}</td><td class="num">${t.letter}</td>
+      <td class="team-cell"><span class="flag">${regionalFlag(t.name,'w40')}</span>${escapeHtml(t.name)}</td>
+      <td class="num">${t.pj}</td><td class="num">${t.gf-t.gc>=0?'+':''}${t.gf-t.gc}</td><td class="num pts-cell">${t.pts}</td>
+      <td class="num">${i<4?'Clasifica':(done?'Eliminado':'')}</td></tr>`).join('')}</tbody></table>
+    <p style="padding:0 20px 16px;color:var(--muted);font-size:12px;">Clasifican los 2 primeros de cada grupo y los 4 mejores terceros de los 6 grupos.</p>
+  </div>`;
+}
+function renderRegional(kind){
+  const M = REGIONAL_META[kind], R = REGIONAL[kind], editable = STATE.admin.unlocked;
+  let body;
+  if(!R.groups){
+    body = (regBuilder.kind===kind && regBuilder.open)
+      ? regBuilderHtml(kind)
+      : `<div class="panel reg-empty">
+          <div class="reg-empty-ico">${M.emoji}</div>
+          <div class="reg-empty-title">Todavía no hay una ${M.short} armada</div>
+          <p>Cuando se arme la edición, acá vas a ver la fase de grupos y la eliminación.</p>
+          <button class="btn-primary" id="regOpenBuild" ${editable?'':'disabled'}>Armar ${M.short}</button>
+          ${editable?'':'<div class="hint" style="margin-top:8px;">Solo el admin puede armarla.</div>'}
+        </div>`;
+  } else {
+    const champ = regChampion(R);
+    body = `
+      <div class="reg-edition-bar">
+        <span class="badge">${M.short.toUpperCase()} ${R.year||''}</span>
+        ${R.host ? `<span class="badge reg-host">Sede: ${regionalFlag(R.host,'w40')} ${escapeHtml(R.host)}</span>` : ''}
+      </div>
+      <div class="bracket-actions" style="padding:0 0 14px;">
+        <button class="btn-primary" id="regGenKO" ${editable?'':'disabled'}>Generar eliminatorias desde grupos</button>
+        <button class="btn-secondary" id="regResetKO" ${editable?'':'disabled'}>Vaciar eliminatorias</button>
+        <button class="btn-secondary" id="regArchive" ${editable && champ?'':'disabled'}>🏆 Archivar campeón</button>
+        <button class="btn-secondary" id="regClearEdition" ${editable?'':'disabled'}>Vaciar edición</button>
+      </div>
+      <h2 class="reg-sub">Fase de grupos</h2>
+      <div class="group-preview-grid">${regGroupsHtml(kind)}</div>
+      ${regThirdsHtml(kind)}
+      <h2 class="reg-sub">Fase de eliminación</h2>
+      <div class="panel">${regBracketHtml(kind)}</div>`;
+  }
+  return `
+    <h1 class="page-title">${M.title} ${editable?'':'<span class="badge">MODO TV</span>'}</h1>
+    ${regPosterHtml(kind)}
+    ${body}`;
+}
+function attachRegionalEvents(kind){
+  const R = REGIONAL[kind], M = REGIONAL_META[kind];
+  const rerender = (sel)=>{
+    const keep = sel ? document.querySelector(sel) : null;
+    const pos = keep ? [keep.selectionStart, keep.selectionEnd] : null;
+    render();
+    if(sel){ const el = document.querySelector(sel); if(el){ el.focus(); try{ el.setSelectionRange(pos[0],pos[1]); }catch(e){} } }
+  };
+  const $ = id => document.getElementById(id);
+
+  content.querySelectorAll('.reg-gscore').forEach(inp=> inp.addEventListener('input', e=>{
+    const m = R.matches.find(x=>x.id===e.target.dataset.id); if(!m) return;
+    const v = e.target.value;
+    m[e.target.dataset.side] = v==='' ? null : Math.max(0, Math.min(20, Number(v)));
+    regSave();
+    rerender(`.reg-gscore[data-id="${m.id}"][data-side="${e.target.dataset.side}"]`);
+  }));
+  content.querySelectorAll('.reg-kscore').forEach(inp=> inp.addEventListener('input', e=>{
+    const m = regFindMatch(R, e.target.dataset.match); if(!m) return;
+    const v = e.target.value, side = e.target.dataset.side;
+    m[side==='home'?'hs':'as'] = v==='' ? null : Math.max(0, Math.min(20, Number(v)));
+    regPropagate(R); regSave();
+    rerender(`.reg-kscore[data-match="${m.id}"][data-side="${side}"]`);
+  }));
+  if($('regGenKO')) $('regGenKO').addEventListener('click', ()=> regGenerateKO(kind));
+  if($('regResetKO')) $('regResetKO').addEventListener('click', ()=>{
+    if(confirm('¿Vaciar las eliminatorias?')){ R.knockout = regEmptyKO(kind); regSave(); render(); }
+  });
+  if($('regArchive')) $('regArchive').addEventListener('click', ()=>{
+    const champ = regChampion(R); if(!champ) return;
+    if(!confirm(`¿Archivar a ${champ} como campeón de la ${M.short} ${R.year||''} y vaciar la edición?`)) return;
+    R.champions.push({year:Number(R.year)||R.year, champion:champ});
+    R.groups = null; R.matches = []; R.knockout = null; R.host = null;
+    regBuilder = { kind:null, selected:[], year:'', draw:null };
+    regSave(); render();
+  });
+  if($('regClearEdition')) $('regClearEdition').addEventListener('click', ()=>{
+    if(!confirm(`¿Vaciar la edición actual de la ${M.short}? Se pierden grupos y resultados (los campeones archivados quedan).`)) return;
+    R.groups = null; R.matches = []; R.knockout = null; R.host = null;
+    regBuilder = { kind:null, selected:[], year:'', draw:null };
+    regSave(); render();
+  });
+  if($('regOpenBuild')) $('regOpenBuild').addEventListener('click', ()=>{
+    regBuilder = { kind, open:true, selected:[], year:'', draw:null }; render();
+  });
+  if($('regCancelBuild')) $('regCancelBuild').addEventListener('click', ()=>{
+    regBuilder = { kind:null, selected:[], year:'', draw:null }; render();
+  });
+  if($('regYear')) $('regYear').addEventListener('input', e=>{ regBuilder.year = e.target.value.replace(/\D/g,''); });
+  content.querySelectorAll('.reg-pick-cb').forEach(cb=> cb.addEventListener('change', e=>{
+    const n = e.target.value, sel = regBuilder.selected;
+    if(e.target.checked){ if(sel.length>=M.size){ e.target.checked=false; return; } if(!sel.includes(n)) sel.push(n); }
+    else regBuilder.selected = sel.filter(x=>x!==n);
+    const y = regBuilder.year; render(); regBuilder.year = y;
+  }));
+  if($('regRandomPick')) $('regRandomPick').addEventListener('click', ()=>{
+    regBuilder.selected = shuffleArray(regPool(kind)).slice(0, M.size); render();
+  });
+  if($('regDoDraw')) $('regDoDraw').addEventListener('click', ()=>{
+    regBuilder.draw = regDrawGroups(kind); render();
+  });
+  if($('regRedraw')) $('regRedraw').addEventListener('click', ()=>{ regBuilder.draw = regDrawGroups(kind); render(); });
+  if($('regBackPick')) $('regBackPick').addEventListener('click', ()=>{ regBuilder.draw = null; render(); });
+  if($('regConfirmDraw')) $('regConfirmDraw').addEventListener('click', ()=>{
+    R.groups = regBuilder.draw;
+    R.year = regBuilder.year ? Number(regBuilder.year) : null;
+    R.host = null;
+    R.matches = R.groups.flatMap(g=>regRoundRobin(g.letter,g.teams));
+    R.knockout = regEmptyKO(kind);
+    regBuilder = { kind:null, selected:[], year:'', draw:null };
+    regSave(); render();
+  });
 }
 
 init();
