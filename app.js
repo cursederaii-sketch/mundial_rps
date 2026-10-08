@@ -687,7 +687,7 @@ function getVisitedViews(){
   try{ return JSON.parse(localStorage.getItem('mundial2042_visited')||'[]'); }catch(e){ return []; }
 }
 function markViewVisited(view){
-  if(!view || view==='copa' || view==='euro') return;
+  if(!view || view==='copa' || view==='euro' || view==='fin') return;
   const set = new Set(getVisitedViews());
   if(set.has(view)) return;
   set.add(view);
@@ -1578,6 +1578,7 @@ function render(){
     case 'album': content.innerHTML = renderAlbumMundial(); attachAlbumEvents(); break;
     case 'copa': content.innerHTML = renderRegional('copa'); attachRegionalEvents('copa'); break;
     case 'euro': content.innerHTML = renderRegional('euro'); attachRegionalEvents('euro'); break;
+    case 'fin': content.innerHTML = renderFinalissima(); attachFinalissimaEvents(); break;
     default: content.innerHTML = renderInicio();
   }
   /* Retriggerea la animación de fade-in en cada cambio de vista: se saca
@@ -4233,6 +4234,7 @@ const REGIONAL_KEY = 'mundial_regional_v1';
 const REGIONAL_META = {
   copa:{ title:'Conmebol Copa América', short:'Copa América', posterTop:'CONMEBOL COPA AMÉRICA', size:16, groupCount:4, emoji:'🌎' },
   euro:{ title:'Eurocopa', short:'Eurocopa', posterTop:'EUROCOPA', size:24, groupCount:6, emoji:'🇪🇺' },
+  fin:{ title:'Finalissima', short:'Finalissima', posterTop:'FINALISSIMA', emoji:'⚔️' },
 };
 const REGIONAL_ISO = {
   'Moldavia':'md','Albania':'al','Eslovenia':'si','Rumanía':'ro','Rumania':'ro','Chequia':'cz',
@@ -4268,12 +4270,14 @@ function regEmptyKO(kind){
   if(kind==='euro') return { r16:[1,2,3,4,5,6,7,8].map(i=>mk('R'+i)), qf:[1,2,3,4].map(i=>mk('Q'+i)), sf:[1,2].map(i=>mk('S'+i)), final:mk('F') };
   return { qf:[1,2,3,4].map(i=>mk('Q'+i)), sf:[1,2].map(i=>mk('S'+i)), final:mk('F') };
 }
+function finDefault(){ return { year:2056, champions:[], hs:null, as:null, ph:null, pa:null }; }
 function regDefault(){
   const euroGroups = EURO_GROUPS_DEFAULT.map((t,i)=>({letter:String.fromCharCode(65+i), teams:t}));
   return {
     copa:{ champions:[{year:2056, champion:'Argentina'}], year:null, groups:null, matches:[], knockout:null },
     euro:{ champions:[], host:'Moldavia', year:2056, groups:euroGroups,
            matches:euroGroups.flatMap(g=>regRoundRobin(g.letter,g.teams)), knockout:regEmptyKO('euro') },
+    fin:finDefault(),
   };
 }
 function regNormalize(r){
@@ -4288,6 +4292,9 @@ function regNormalize(r){
     if(x.groups && !x.knockout) x.knockout = regEmptyKO(k);
     if(!x.groups) x.knockout = null;
   });
+  /* Finalissima: si todavía no existe en lo guardado, arranca con la edición 2056 pendiente */
+  const f = r.fin = r.fin || finDefault();
+  f.champions = Array.isArray(f.champions) ? f.champions : Object.values(f.champions||{});
   return r;
 }
 let REGIONAL = (function(){
@@ -4323,7 +4330,7 @@ function initRegionalSync(){
     regApplying = true;
     REGIONAL = next;
     try{ localStorage.setItem(REGIONAL_KEY, JSON.stringify(REGIONAL)); }catch(e){}
-    if(STATE.view==='copa' || STATE.view==='euro') render();
+    if(STATE.view==='copa' || STATE.view==='euro' || STATE.view==='fin') render();
     regApplying = false;
   });
 }
@@ -4460,6 +4467,7 @@ function regPosterHtml(kind){
       <div class="rp-flag">${regionalFlag(c.champion,'w160')}</div>
       <div class="rp-year">${c.year}</div>
       <div class="rp-name">${escapeHtml(c.champion)}</div>
+      ${c.runnerUp ? `<div class="rp-sub">vs ${escapeHtml(c.runnerUp)}${hasScore(c.hs)&&hasScore(c.as) ? ` · ${c.hs}-${c.as}${hasScore(c.ph)&&hasScore(c.pa) ? ` (${c.ph}-${c.pa} pen.)` : ''}` : ''}</div>` : ''}
     </div>`).join('');
   return `
   <div class="champ-poster">
@@ -4645,6 +4653,129 @@ function attachRegionalEvents(kind){
     R.matches = R.groups.flatMap(g=>regRoundRobin(g.letter,g.teams));
     R.knockout = regEmptyKO(kind);
     regBuilder = { kind:null, selected:[], year:'', draw:null };
+    regSave(); render();
+  });
+}
+
+/* =========================================================
+   FINALISSIMA — campeón de la Copa América vs campeón de la Eurocopa
+   Un solo partido pendiente. Cada lado se completa solo cuando termina
+   el torneo (final jugada en la edición actual, o campeón ya archivado
+   con el mismo año). Si falta uno, queda "Por definir". El admin carga
+   el resultado y al archivar el campeón pasa al Salón de la Fama de la
+   Finalissima. Se guarda en REGIONAL.fin (mismo nodo de Firebase).
+   ========================================================= */
+function finSide(kind){
+  const F = REGIONAL.fin, R = REGIONAL[kind];
+  if(!F.year) return null;
+  const arch = R.champions.find(c=> Number(c.year)===Number(F.year));
+  if(arch) return arch.champion;
+  if(R.groups && Number(R.year)===Number(F.year)) return regChampion(R);
+  return null;
+}
+function finMatch(){
+  const F = REGIONAL.fin;
+  return { homeName:finSide('copa'), awayName:finSide('euro'), hs:F.hs, as:F.as, ph:F.ph, pa:F.pa };
+}
+function finWinner(m){
+  if(!m.homeName || !m.awayName || !isPlayed(m)) return null;
+  const hs=Number(m.hs), as=Number(m.as);
+  if(hs>as) return m.homeName;
+  if(as>hs) return m.awayName;
+  if(hasScore(m.ph) && hasScore(m.pa)){
+    const a=Number(m.ph), b=Number(m.pa);
+    if(a>b) return m.homeName;
+    if(b>a) return m.awayName;
+  }
+  return null;
+}
+function finSideHtml(name, label){
+  if(name) return `<div class="fin-side">
+      <div class="fin-label">${label}</div>
+      <div class="rp-flag fin-flag">${regionalFlag(name,'w160')}</div>
+      <div class="rp-name fin-name">${escapeHtml(name)}</div>
+    </div>`;
+  return `<div class="fin-side pending">
+      <div class="fin-label">${label}</div>
+      <div class="rp-flag fin-flag fin-tbd"><span>?</span></div>
+      <div class="rp-name fin-name">Por definir</div>
+    </div>`;
+}
+function renderFinalissima(){
+  const M = REGIONAL_META.fin, F = REGIONAL.fin, editable = STATE.admin.unlocked;
+  const m = finMatch(), ready = !!(m.homeName && m.awayName), played = ready && isPlayed(m);
+  const champ = finWinner(m);
+  const tie = played && Number(m.hs)===Number(m.as);
+  const yr = F.year ? ` ${F.year}` : '';
+  const status = !F.year ? 'Esperando próxima edición'
+    : played ? (champ ? 'Finalizado' : 'Empate: cargá los penales')
+    : ready ? 'Listo para jugar'
+    : (!m.homeName && !m.awayName) ? 'Esperando a los dos campeones'
+    : (!m.awayName ? 'Esperando al campeón de la Eurocopa' : 'Esperando al campeón de la Copa América');
+  const canEdit = editable && ready;
+  const scoreInput = (side, val)=>`<input class="score-input fin-score" type="number" min="0" max="20" data-side="${side}" value="${val??''}" placeholder="-" ${canEdit?'':'disabled'}>`;
+  const penInput = (side, val)=>`<input class="score-input fin-score fin-pen" type="number" min="0" max="30" data-side="${side}" value="${val??''}" placeholder="-" ${canEdit?'':'disabled'}>`;
+  return `
+    <h1 class="page-title">${M.title} ${editable?'':'<span class="badge">MODO TV</span>'}</h1>
+    ${regPosterHtml('fin')}
+    <div class="reg-edition-bar">
+      <span class="badge">FINALISSIMA${yr}</span>
+      <span class="badge ${ready?'on':''}">${status}</span>
+    </div>
+    <div class="panel fin-card">
+      <div class="fin-stage">
+        ${finSideHtml(m.homeName, 'Campeón Copa América'+(F.year?' '+F.year:''))}
+        <div class="fin-center">
+          <div class="fin-vs">VS</div>
+          ${ready ? `<div class="fin-score-row">${scoreInput('hs',m.hs)}<span class="vs-label">-</span>${scoreInput('as',m.as)}</div>
+            ${tie ? `<div class="fin-pen-row"><span class="mini-label">Penales</span>${penInput('ph',m.ph)}<span class="vs-label">-</span>${penInput('pa',m.pa)}</div>` : ''}`
+            : `<div class="fin-pending-note">Partido pendiente</div>`}
+        </div>
+        ${finSideHtml(m.awayName, 'Campeón Eurocopa'+(F.year?' '+F.year:''))}
+      </div>
+      ${champ ? `<div class="fin-champ"><div class="champion-label">CAMPEÓN FINALISSIMA</div>
+        <div class="champion-name">${regLabel(champ)}</div></div>` : ''}
+      <div class="bracket-actions fin-actions">
+        <button class="btn-primary" id="finArchive" ${editable && champ?'':'disabled'}>🏆 Archivar campeón</button>
+        <button class="btn-secondary" id="finResetScore" ${editable?'':'disabled'}>Vaciar resultado</button>
+        ${editable ? `<label class="mini-label fin-year-label">Edición
+          <input type="text" id="finYear" maxlength="4" value="${F.year??''}" placeholder="Ej: 2056" style="max-width:100px;"></label>` : ''}
+      </div>
+      <p class="fin-hint">Cada lado se completa solo cuando termina la Copa América o la Eurocopa de esa edición. ${editable?'':'Solo el admin carga el resultado.'}</p>
+    </div>`;
+}
+function attachFinalissimaEvents(){
+  const F = REGIONAL.fin, $ = id => document.getElementById(id);
+  content.querySelectorAll('.fin-score').forEach(inp=> inp.addEventListener('input', e=>{
+    const side = e.target.dataset.side, v = e.target.value;
+    F[side] = v==='' ? null : Math.max(0, Math.min(30, Number(v)));
+    if(side==='hs' || side==='as'){
+      const t = Number(F.hs)===Number(F.as) && hasScore(F.hs) && hasScore(F.as);
+      if(!t){ F.ph = null; F.pa = null; }
+    }
+    regSave();
+    const sel = `.fin-score[data-side="${side}"]`;
+    const pos = [e.target.selectionStart, e.target.selectionEnd];
+    render();
+    const el = document.querySelector(sel); if(el){ el.focus(); try{ el.setSelectionRange(pos[0],pos[1]); }catch(err){} }
+  }));
+  if($('finResetScore')) $('finResetScore').addEventListener('click', ()=>{
+    if(confirm('¿Vaciar el resultado de la Finalissima?')){ F.hs=F.as=F.ph=F.pa=null; regSave(); render(); }
+  });
+  if($('finYear')) $('finYear').addEventListener('change', e=>{
+    const v = e.target.value.replace(/\D/g,'');
+    F.year = v ? Number(v) : null; F.hs=F.as=F.ph=F.pa=null;
+    regSave(); render();
+  });
+  if($('finArchive')) $('finArchive').addEventListener('click', ()=>{
+    const m = finMatch(), champ = finWinner(m); if(!champ) return;
+    if(!confirm(`¿Archivar a ${champ} como campeón de la Finalissima ${F.year||''}?`)) return;
+    F.champions.push({
+      year: Number(F.year)||F.year, champion:champ,
+      runnerUp: champ===m.homeName ? m.awayName : m.homeName,
+      hs:m.hs, as:m.as, ph:hasScore(m.ph)?m.ph:null, pa:hasScore(m.pa)?m.pa:null
+    });
+    F.year = null; F.hs=F.as=F.ph=F.pa=null;
     regSave(); render();
   });
 }
